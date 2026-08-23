@@ -8,10 +8,6 @@ const client = new Client({
     ] 
 });
 
-// ⚠️ PASTE TOKEN BOT DISCORD KAMU DISINI
-const TOKEN_BOT = process.env.TOKEN;
- 
-
 const OWO_BOT_ID = "408785106942164992"; 
 const GOD_BOT_ID = "1521044059643318443"; 
 
@@ -199,13 +195,48 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // --- 🚨 ANTI-CAPTCHA / GOD DETECTOR ---
-    if (message.author.id === GOD_BOT_ID) {
+    // --- 🤖 DETEKSI & REMINDER AUTOHUNT BOT GOD VIA DM ---
+    if (message.author.id === GOD_BOT_ID || message.author.username.includes('GoD')) {
+        
+        // 1. Anti-Captcha Detector
         if (message.content.includes("captcha") || message.content.includes("verify")) {
             message.channel.send(`🚨 **PERINGATAN GOD:** Ada Captcha/Verifikasi! Cek sekarang!`);
+        }
+
+        // 2. Reminder Autohunt GoD
+        if (message.content.includes('I WILL BE BACK IN')) {
+            const hoursMatch = message.content.match(/(\d+)H/i);
+            const minutesMatch = message.content.match(/(\d+)M/i);
+
+            let totalMs = 0;
+            if (hoursMatch) totalMs += parseInt(hoursMatch[1]) * 60 * 60 * 1000;
+            if (minutesMatch) totalMs += parseInt(minutesMatch[1]) * 60 * 1000;
+
+            // Mengambil User dari mention atau pesan GoD
+            const targetUser = message.mentions.users.first() || client.users.cache.get(lastHunterId);
+
+            if (totalMs > 0) {
+                const hours = hoursMatch ? hoursMatch[1] : 0;
+                const minutes = minutesMatch ? minutesMatch[1] : 0;
+
+                const userTag = targetUser ? `<@${targetUser.id}>` : "kamu";
+                message.channel.send(`⏰ **Pengingat Dipasang!** Aku bakal DM ${userTag} dalam **${hours} jam ${minutes} menit** lagi.`);
+
+                setTimeout(async () => {
+                    if (targetUser) {
+                        try {
+                            await targetUser.send(`🔔 **AUTOHUNT GOD SELESAI!** Waktunya ketik \`ghb 1d\` lagi di server!`);
+                        } catch (error) {
+                            message.channel.send(`🔔 <@${targetUser.id}> **AUTOHUNT GOD SELESAI!** (Gagal kirim DM, cek apakah DM server aktif).`);
+                        }
+                    } else {
+                        message.channel.send(`🔔 **AUTOHUNT GOD SELESAI!** Waktunya ketik \`ghb 1d\` lagi!`);
+                    }
+                }, totalMs);
+            }
         }
     }
 });
 
-client.login(TOKEN_BOT);
-
+client.login(process.env.TOKEN || TOKEN_BOT);
+                        
