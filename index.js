@@ -21,12 +21,13 @@ let isPrayEnabled = true;
 const DEFAULT_GIF_HUNT = "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif";
 const DEFAULT_GIF_PRAY = "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif";
 
-// 📦 Penyimpanan Custom GIF Per User ID
-const userCustomHunt = new Map(); // Menyimpan GIF Hunt per User
-const userCustomPray = new Map(); // Menyimpan GIF Pray per User
+// 📦 Penyimpanan Custom GIF & User Action Per Channel/User
+const userCustomHunt = new Map();
+const userCustomPray = new Map();
 
-let lastHunterId = null;
-let lastPrayerId = null;
+// Menyimpan ID pengguna terakhir per channel
+const lastHunterByChannel = new Map();
+const lastPrayerByChannel = new Map();
 
 client.on('ready', () => {
     console.log(`✅ Bot ${client.user.tag} aktif & siap memantau!`);
@@ -88,7 +89,7 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embedHelp] });
         }
 
-        // 2. !pai gif <hunt/pray> <link_gif> (Kustom Per User)
+        // 2. !pai gif <hunt/pray> <link_gif>
         if (command === 'gif') {
             const kategori = args[0]?.toLowerCase();
             const linkGif = args[1];
@@ -139,13 +140,13 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // --- 🎯 DETEKSI COMMAND OWO ---
-    if (msgLower === 'wh' || msgLower === 'owo hunt' || msgLower.startsWith('owo h')) {
-        lastHunterId = message.author.id;
+    // --- 🎯 DETEKSI COMMAND OWO DARI USER ---
+    if (msgLower === 'wh' || msgLower === 'owo hunt' || msgLower.startsWith('owo h ') || msgLower.startsWith('wh ')) {
+        lastHunterByChannel.set(message.channel.id, message.author.id);
     }
 
     if (msgLower.includes('wpray') || msgLower.includes('owo pray') || msgLower === 'wp' || msgLower === 'pr') {
-        lastPrayerId = message.author.id;
+        lastPrayerByChannel.set(message.channel.id, message.author.id);
     }
 
     // --- 🔔 DETEKSI PENGINGAT DARI OWO BOT ---
@@ -153,45 +154,48 @@ client.on('messageCreate', async (message) => {
         
         // Reminder Hunt (15 Detik)
         if (isHuntEnabled && (message.content.includes("hunted") || message.content.includes("caught") || message.content.includes("found"))) {
-            const hunterToMention = message.mentions.users.first()?.id || lastHunterId;
+            // Ambil target user dari reply, mention, atau user terakhir di channel ini
+            const hunterToMention = message.reference ? (await message.fetchReference().catch(() => null))?.author?.id : null
+                || message.mentions.users.first()?.id 
+                || lastHunterByChannel.get(message.channel.id);
 
-            setTimeout(() => {
-                const targetText = hunterToMention ? `<@${hunterToMention}>` : "Hunter";
-                
-                // Ambil GIF kustom milik user yang bersangkutan, jika tidak ada pakai Default
-                const userGif = userCustomHunt.get(hunterToMention) || DEFAULT_GIF_HUNT;
+            if (hunterToMention) {
+                setTimeout(() => {
+                    const userGif = userCustomHunt.get(hunterToMention) || DEFAULT_GIF_HUNT;
 
-                const embedHunt = new EmbedBuilder()
-                    .setColor('#2B2D31')
-                    .setImage(userGif);
+                    const embedHunt = new EmbedBuilder()
+                        .setColor('#2B2D31')
+                        .setImage(userGif);
 
-                message.channel.send({ 
-                    content: `🔔 ${targetText} , waktunya untuk **owo hunt**!`, 
-                    embeds: [embedHunt] 
-                });
-            }, 15000); 
+                    message.channel.send({ 
+                        content: `🔔 <@${hunterToMention}> , waktunya untuk **owo hunt**!`, 
+                        embeds: [embedHunt] 
+                    });
+                }, 15000); 
+            }
         }
 
         // Reminder Pray (5 Menit)
         const owoText = message.content.toLowerCase();
         if (isPrayEnabled && (owoText.includes("prayed") || owoText.includes("blessed") || owoText.includes("cursed") || owoText.includes("luck point"))) {
-            const prayerToMention = message.mentions.users.first()?.id || lastPrayerId;
+            const prayerToMention = message.reference ? (await message.fetchReference().catch(() => null))?.author?.id : null
+                || message.mentions.users.first()?.id 
+                || lastPrayerByChannel.get(message.channel.id);
 
-            setTimeout(() => {
-                const targetText = prayerToMention ? `<@${prayerToMention}>` : "Player";
+            if (prayerToMention) {
+                setTimeout(() => {
+                    const userGif = userCustomPray.get(prayerToMention) || DEFAULT_GIF_PRAY;
 
-                // Ambil GIF kustom milik user yang bersangkutan, jika tidak ada pakai Default
-                const userGif = userCustomPray.get(prayerToMention) || DEFAULT_GIF_PRAY;
+                    const embedPray = new EmbedBuilder()
+                        .setColor('#2B2D31')
+                        .setImage(userGif);
 
-                const embedPray = new EmbedBuilder()
-                    .setColor('#2B2D31')
-                    .setImage(userGif);
-
-                message.channel.send({ 
-                    content: `🔔 ${targetText} , waktunya untuk **wpray**!`, 
-                    embeds: [embedPray] 
-                });
-            }, 300000); 
+                    message.channel.send({ 
+                        content: `🔔 <@${prayerToMention}> , waktunya untuk **wpray**!`, 
+                        embeds: [embedPray] 
+                    });
+                }, 300000); 
+            }
         }
     }
 
@@ -212,25 +216,20 @@ client.on('messageCreate', async (message) => {
             if (hoursMatch) totalMs += parseInt(hoursMatch[1]) * 60 * 60 * 1000;
             if (minutesMatch) totalMs += parseInt(minutesMatch[1]) * 60 * 1000;
 
-            // Mengambil User dari mention atau pesan GoD
-            const targetUser = message.mentions.users.first() || client.users.cache.get(lastHunterId);
+            const targetUser = message.mentions.users.first() 
+                || (message.reference ? (await message.fetchReference().catch(() => null))?.author : null);
 
-            if (totalMs > 0) {
+            if (totalMs > 0 && targetUser) {
                 const hours = hoursMatch ? hoursMatch[1] : 0;
                 const minutes = minutesMatch ? minutesMatch[1] : 0;
 
-                const userTag = targetUser ? `<@${targetUser.id}>` : "kamu";
-                message.channel.send(`⏰ **Pengingat Dipasang!** Aku bakal DM ${userTag} dalam **${hours} jam ${minutes} menit** lagi.`);
+                message.channel.send(`⏰ **Pengingat Dipasang!** Aku bakal DM <@${targetUser.id}> dalam **${hours} jam ${minutes} menit** lagi.`);
 
                 setTimeout(async () => {
-                    if (targetUser) {
-                        try {
-                            await targetUser.send(`🔔 **AUTOHUNT GOD SELESAI!** Waktunya ketik \`ghb 1d\` lagi di server!`);
-                        } catch (error) {
-                            message.channel.send(`🔔 <@${targetUser.id}> **AUTOHUNT GOD SELESAI!** (Gagal kirim DM, cek apakah DM server aktif).`);
-                        }
-                    } else {
-                        message.channel.send(`🔔 **AUTOHUNT GOD SELESAI!** Waktunya ketik \`ghb 1d\` lagi!`);
+                    try {
+                        await targetUser.send(`🔔 **AUTOHUNT GOD SELESAI!** Waktunya ketik \`ghb 1d\` lagi di server!`);
+                    } catch (error) {
+                        message.channel.send(`🔔 <@${targetUser.id}> **AUTOHUNT GOD SELESAI!** (Gagal kirim DM, cek apakah DM server aktif).`);
                     }
                 }, totalMs);
             }
@@ -239,4 +238,4 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.TOKEN || TOKEN_BOT);
-                        
+        
