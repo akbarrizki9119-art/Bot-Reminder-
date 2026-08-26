@@ -26,7 +26,7 @@ function getServerConfig(guildId) {
     return serverSettings.get(guildId);
 }
 
-// 📦 Settings Per User
+// 📦 Settings Per User (Mode dipisah untuk OWO, HUNT, dan PRAY)
 const userSettings = new Map();
 
 function getUserConfig(userId) {
@@ -37,7 +37,13 @@ function getUserConfig(userId) {
             owoEnabled: true,
             pingsEnabled: true,
             replyEnabled: true,
-            mode: 'text', // 'text' atau 'gif'
+            
+            // 🎯 Mode dipisah per fitur!
+            owoMode: 'text',  // 'text' atau 'gif'
+            huntMode: 'text', // 'text' atau 'gif'
+            prayMode: 'text', // 'text' atau 'gif'
+
+            owoGif: "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif",
             huntGif: "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif",
             prayGif: "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif"
         });
@@ -58,12 +64,9 @@ function createHelpEmbed(guildName, avatarURL) {
         .setAuthor({ name: '🏓 Reminders', iconURL: client.user.displayAvatarURL() })
         .setDescription(
             `Gunakan \`!pai help\` untuk melihat bantuan.\n\n` +
-            `\`owo\`\n` +
-            `Do \`!pai owo\` to manage your **owo/uwu** 🌿 reminder\n\n` +
-            `\`owoh\`\n` +
-            `Do \`!pai owoh\` to manage your **owoh/owob** 🌿⚔️ reminder\n\n` +
-            `\`owopray\`\n` +
-            `Do \`!pai owopray\` to manage your **pray/curse** 🙏👻 reminder`
+            `\`owo\`\nDo \`!pai owo\` to manage your **owo/uwu** 🌿 reminder\n\n` +
+            `\`owoh\`\nDo \`!pai owoh\` to manage your **owoh/owob** 🌿⚔️ reminder\n\n` +
+            `\`owopray\`\nDo \`!pai owopray\` to manage your **pray/curse** 🙏👻 reminder`
         )
         .setFooter({ text: `Dibuat khusus untuk Server ${guildName || 'OPPAI'}`, iconURL: avatarURL });
 }
@@ -91,24 +94,12 @@ function createServerSettingsEmbed(guildId) {
         .setColor('#5865F2')
         .setTitle('Server Settings')
         .setDescription(
-            `⚙️ **OwO bot prefix**\n` +
-            `\`\`\`\n${config.owoPrefix}\n\`\`\`\n` +
-            `do \`owoprefix\` to update\n\n` +
-            `🤖 **reaction bot prefix**\n` +
-            `\`\`\`\n${config.botPrefix}\n\`\`\`\n` +
-            `\`${config.botPrefix} s prefix <prefix_baru>\` to update\n\n` +
-            `🔄 **use default prefix !pai**\n` +
-            `${config.useDefaultPrefix ? '✅' : '❌'}\n` +
-            `\`${config.botPrefix} s default\` to update\n\n` +
-            `🌱 **owo reminder**\n` +
-            `\`${config.botPrefix} s owo <pesan>\` to update\n` +
-            `\`{USER} ${config.owoMsg}\`\n\n` +
-            `🌱 **hunt/battle reminder**\n` +
-            `\`${config.botPrefix} s hunt <pesan>\` to update\n` +
-            `\`{USER} ${config.huntMsg}\`\n\n` +
-            `☘️ **pray/curse reminder**\n` +
-            `\`${config.botPrefix} s pray <pesan>\` to update\n` +
-            `\`{USER} ${config.prayMsg}\``
+            `⚙️ **OwO bot prefix**\n\`\`\`\n${config.owoPrefix}\n\`\`\`\ndo \`owoprefix\` to update\n\n` +
+            `🤖 **reaction bot prefix**\n\`\`\`\n${config.botPrefix}\n\`\`\`\n\`${config.botPrefix} s prefix <prefix_baru>\` to update\n\n` +
+            `🔄 **use default prefix !pai**\n${config.useDefaultPrefix ? '✅' : '❌'}\n\`${config.botPrefix} s default\` to update\n\n` +
+            `🌱 **owo reminder**\n\`${config.botPrefix} s owo <pesan>\` to update\n\`{USER} ${config.owoMsg}\`\n\n` +
+            `🌱 **hunt/battle reminder**\n\`${config.botPrefix} s hunt <pesan>\` to update\n\`{USER} ${config.huntMsg}\`\n\n` +
+            `☘️ **pray/curse reminder**\n\`${config.botPrefix} s pray <pesan>\` to update\n\`{USER} ${config.prayMsg}\``
         );
 }
 
@@ -116,6 +107,7 @@ function createServerSettingsEmbed(guildId) {
 function createSettingsEmbed(user, type) {
     const config = getUserConfig(user.id);
     let isEnabled = type === 'owoh' ? config.huntEnabled : (type === 'owo' ? config.owoEnabled : config.prayEnabled);
+    let currentMode = type === 'owoh' ? config.huntMode : (type === 'owo' ? config.owoMode : config.prayMode);
     let title = `${user.username}'s ${type === 'owoh' ? 'hunt/battle' : (type === 'owo' ? 'owo/uwu' : 'pray/curse')} reminder settings`;
 
     return new EmbedBuilder()
@@ -125,13 +117,14 @@ function createSettingsEmbed(user, type) {
             `${isEnabled ? '✅' : '❌'} **Is this reminder enabled?**\n\n` +
             `${config.pingsEnabled ? '✅' : '❌'} **Pings / mentions enabled?**\n` +
             `${config.replyEnabled ? '✅' : '❌'} **Use inline replies?**\n` +
-            `💬 **Current Mode:** \`${config.mode.toUpperCase()}\``
+            `💬 **Current Mode:** \`${currentMode.toUpperCase()}\``
         );
 }
 
 function createSettingsButtons(user, type) {
     const config = getUserConfig(user.id);
     let isEnabled = type === 'owoh' ? config.huntEnabled : (type === 'owo' ? config.owoEnabled : config.prayEnabled);
+    let currentMode = type === 'owoh' ? config.huntMode : (type === 'owo' ? config.owoMode : config.prayMode);
 
     return [
         new ActionRowBuilder().addComponents(
@@ -154,7 +147,7 @@ function createSettingsButtons(user, type) {
                 .setStyle(config.replyEnabled ? ButtonStyle.Success : ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`toggle_mode_${type}_${user.id}`)
-                .setLabel(`mode: ${config.mode}`)
+                .setLabel(`mode: ${currentMode}`)
                 .setEmoji('🖼️')
                 .setStyle(ButtonStyle.Primary)
         )
@@ -174,12 +167,11 @@ client.on('messageCreate', async (message) => {
 
     // --- 🤖 DETEKSI PESAN DARI BOT (OwO / GoD Bot) ---
     if (message.author.bot) {
-        // Warning Captcha dari Bot
         if (msgLower.includes("captcha") || msgLower.includes("verify")) {
             message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`);
         }
 
-        // Deteksi pesan timer Huntbot: "I WILL BE BACK IN ..."
+        // Deteksi Huntbot "I WILL BE BACK IN ..."
         if (msgUpper.includes('I WILL BE BACK IN')) {
             const hoursMatch = msgUpper.match(/(\d+)\s*H/i);
             const minutesMatch = msgUpper.match(/(\d+)\s*M/i);
@@ -190,16 +182,13 @@ client.on('messageCreate', async (message) => {
             if (minutesMatch) totalMs += parseInt(minutesMatch[1]) * 60 * 1000;
             if (secondsMatch) totalMs += parseInt(secondsMatch[1]) * 1000;
 
-            // 🔍 Cari Siapa User Target:
             let targetUser = message.mentions.users.first();
 
-            // Jika tidak ada mention, cek reference/reply
             if (!targetUser && message.reference) {
                 const referencedMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
                 if (referencedMsg) targetUser = referencedMsg.author;
             }
 
-            // Jika masih tidak ketemu, cari user non-bot terakhir yang mengetik ghb / whb di channel ini
             if (!targetUser) {
                 const recentMessages = await message.channel.messages.fetch({ limit: 10 }).catch(() => null);
                 if (recentMessages) {
@@ -216,21 +205,18 @@ client.on('messageCreate', async (message) => {
                 const displayH = hoursMatch ? hoursMatch[1] : 0;
                 const displayM = minutesMatch ? minutesMatch[1] : 0;
 
-                // 📌 Kirim Pesan Konfirmasi di Channel (Persis seperti Screenshot 2)
                 message.channel.send(`⏰ **Pengingat Dipasang!** Aku bakal DM <@${targetUser.id}> dalam **${displayH} jam ${displayM} menit** lagi.`);
 
-                // ⏳ Pasang Timer Pengingat
                 setTimeout(async () => {
                     try {
                         await targetUser.send(`🔔 <@${targetUser.id}>, **HUNTBOT / AUTOHUNT SELESAI!** Waktunya cek huntbot kamu lagi!`);
-                        console.log(`✅ DM Huntbot terkirim ke ${targetUser.tag}`);
                     } catch (error) {
                         message.channel.send(`🔔 <@${targetUser.id}>, **HUNTBOT / AUTOHUNT SELESAI!** (Gagal kirim DM karena DM ditutup).`);
                     }
                 }, totalMs);
             }
         }
-        return; // Hentikan proses pesan bot di sini
+        return;
     }
 
     // --- 🛠️ COMMAND HANDLER (!pai ...) ---
@@ -245,7 +231,6 @@ client.on('messageCreate', async (message) => {
         const args = content.slice(usedPrefix.length).trim().split(/ +/);
         const command = args.shift()?.toLowerCase();
 
-        // 📌 1. MENU HELP & SETTINGS
         if (!command || command === 'help') {
             const helpEmbed = createHelpEmbed(message.guild?.name, message.author.displayAvatarURL());
             const helpButtons = createHelpButtons();
@@ -257,24 +242,16 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ embeds: [embed] });
         }
 
-        // 📌 2. UBAH PREFIX (!pai prefix <prefix_baru>)
         if (command === 'prefix') {
             const newPrefix = args[0];
-            if (!newPrefix) {
-                return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} prefix ?\``);
-            }
+            if (!newPrefix) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} prefix ?\``);
             serverCfg.botPrefix = newPrefix;
             return message.channel.send(`✅ Prefix bot untuk server ini berhasil diubah menjadi: \`${newPrefix}\``);
         }
 
-        // 📌 3. SERVER SETTINGS COMMAND (!pai s)
         if (command === 's' || command === 'set') {
             const subCmd = args.shift()?.toLowerCase();
-
-            if (!subCmd) {
-                const embed = createServerSettingsEmbed(guildId);
-                return message.channel.send({ embeds: [embed] });
-            }
+            if (!subCmd) return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
             if (subCmd === 'prefix') {
                 const newPrefix = args[0];
@@ -308,21 +285,20 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // 📌 4. SHORTCUT PANEL SETTING USER (!pai owo, !pai owoh, !pai owopray)
         if (command === 'owoh' || command === 'owo' || command === 'owopray') {
             const embed = createSettingsEmbed(message.author, command);
             const components = createSettingsButtons(message.author, command);
             return message.channel.send({ embeds: [embed], components });
         }
 
-        // 📌 5. ATUR GIF KUSTOM (!pai gif hunt <link>)
         if (command === 'gif') {
             const kategori = args[0]?.toLowerCase();
             const linkGif = args[1];
             if (!kategori || !linkGif || (!linkGif.startsWith('http://') && !linkGif.startsWith('https://'))) {
                 return message.channel.send(`❌ Format salah! Contoh: \`${usedPrefix} gif hunt <link_gif>\``);
             }
-            if (kategori === 'hunt' || kategori === 'owoh') userCfg.huntGif = linkGif;
+            if (kategori === 'owo') userCfg.owoGif = linkGif;
+            else if (kategori === 'hunt' || kategori === 'owoh') userCfg.huntGif = linkGif;
             else if (kategori === 'pray' || kategori === 'owopray') userCfg.prayGif = linkGif;
 
             return message.channel.send(`✅ GIF **${kategori}** diperbarui!`);
@@ -331,7 +307,7 @@ client.on('messageCreate', async (message) => {
 
     // --- 🎯 AUTOMATIC REMINDERS (15 DETIK / 5 MENIT) ---
 
-    // 1. owo / uwu
+    // 1. owo / uwu (15 Detik)
     if ((msgLower === 'owo' || msgLower === 'uwu') && userCfg.owoEnabled) {
         const timerKey = `${userId}_owo_${message.channel.id}`;
         if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
@@ -340,7 +316,7 @@ client.on('messageCreate', async (message) => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
             const payload = { content: `${mentionStr} ${serverCfg.owoMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
-            if (userCfg.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.huntGif)];
+            if (userCfg.owoMode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.owoGif)];
 
             message.channel.send(payload).catch(() => {});
             activeTimers.delete(timerKey);
@@ -350,7 +326,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // 2. wh / owoh
+    // 2. wh / owoh (15 Detik)
     if ((msgLower === 'wh' || msgLower === 'owo hunt' || msgLower.startsWith('wh ') || msgLower.startsWith('owo h ')) && userCfg.huntEnabled) {
         const timerKey = `${userId}_hunt_${message.channel.id}`;
         if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
@@ -359,7 +335,7 @@ client.on('messageCreate', async (message) => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
             const payload = { content: `${mentionStr} ${serverCfg.huntMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
-            if (userCfg.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.huntGif)];
+            if (userCfg.huntMode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.huntGif)];
 
             message.channel.send(payload).catch(() => {});
             activeTimers.delete(timerKey);
@@ -378,7 +354,7 @@ client.on('messageCreate', async (message) => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
             const payload = { content: `${mentionStr} ${serverCfg.prayMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
-            if (userCfg.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.prayGif)];
+            if (userCfg.prayMode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.prayGif)];
 
             message.channel.send(payload).catch(() => {});
             activeTimers.delete(timerKey);
@@ -426,7 +402,10 @@ client.on('interactionCreate', async (interaction) => {
         } else if (key === 'reply') {
             config.replyEnabled = !config.replyEnabled;
         } else if (key === 'mode') {
-            config.mode = config.mode === 'text' ? 'gif' : 'text';
+            // 🔄 Toggle mode spesifik sesuai dengan type menu yang dibuka!
+            if (type === 'owo') config.owoMode = config.owoMode === 'text' ? 'gif' : 'text';
+            if (type === 'owoh') config.huntMode = config.huntMode === 'text' ? 'gif' : 'text';
+            if (type === 'owopray') config.prayMode = config.prayMode === 'text' ? 'gif' : 'text';
         }
 
         const embed = createSettingsEmbed(interaction.user, type);
@@ -437,4 +416,3 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(process.env.TOKEN);
-                          
