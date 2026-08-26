@@ -454,4 +454,6 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// GANTI process.env.TOKEN DENGAN TOKEN BOT-MU JIKA TIDAK MEMAKAI FILE .ENV / REPLI
+// MEMAKAI VARIABLE TOKEN DARI RAILWAY
+client.login(process.env.TOKEN);
+        
