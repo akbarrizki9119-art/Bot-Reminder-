@@ -154,9 +154,7 @@ client.on('messageCreate', async (message) => {
         
         // Reminder Hunt (15 Detik)
         if (isHuntEnabled && (message.content.includes("hunted") || message.content.includes("caught") || message.content.includes("found"))) {
-            // Ambil target user dari reply, mention, atau user terakhir di channel ini
-            const hunterToMention = message.reference ? (await message.fetchReference().catch(() => null))?.author?.id : null
-                || message.mentions.users.first()?.id 
+            const hunterToMention = message.mentions.users.first()?.id 
                 || lastHunterByChannel.get(message.channel.id);
 
             if (hunterToMention) {
@@ -177,9 +175,8 @@ client.on('messageCreate', async (message) => {
 
         // Reminder Pray (5 Menit)
         const owoText = message.content.toLowerCase();
-        if (isPrayEnabled && (owoText.includes("prayed") || owoText.includes("blessed") || owoText.includes("cursed") || owoText.includes("luck point"))) {
-            const prayerToMention = message.reference ? (await message.fetchReference().catch(() => null))?.author?.id : null
-                || message.mentions.users.first()?.id 
+        if (isPrayEnabled && (owoText.includes("prayed") || owoText.includes("blessed") || owoText.includes("cursed") || owoText.includes("luck point") || owoText.includes("pray"))) {
+            const prayerToMention = message.mentions.users.first()?.id 
                 || lastPrayerByChannel.get(message.channel.id);
 
             if (prayerToMention) {
@@ -237,5 +234,5 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-client.login(process.env.TOKEN || TOKEN_BOT);
-        
+client.login(process.env.TOKEN);
+                        
