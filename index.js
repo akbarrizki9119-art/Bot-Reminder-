@@ -115,9 +115,7 @@ function createServerSettingsEmbed(guildId) {
             `🌱 **hunt/battle reminder**\n\`${config.botPrefix} s hunt <pesan>\` to update\n\`{USER} ${config.huntMsg}\`\n\n` +
             `☘️ **pray/curse reminder**\n\`${config.botPrefix} s pray <pesan>\` to update\n\`{USER} ${config.prayMsg}\``
         );
-}
-
-// --- 🎨 EMBED USER SETTINGS ---
+    // --- 🎨 EMBED USER SETTINGS ---
 function createSettingsEmbed(user, type) {
     const config = getUserConfig(user.id);
     let isEnabled = type === 'owoh' ? config.huntEnabled : (type === 'owo' ? config.owoEnabled : config.prayEnabled);
@@ -196,9 +194,8 @@ client.on('messageCreate', async (message) => {
             if (secondsMatch) totalMs += parseInt(secondsMatch[1]) * 1000;
 
             let targetUser = message.mentions.users.first();
-            let huntTypeLabel = "OWO HUNTBOT"; // Default nama
+            let huntTypeLabel = "OWO HUNTBOT";
 
-            // 1. Cek dari Reply Message
             if (message.reference) {
                 const referencedMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
                 if (referencedMsg) {
@@ -212,7 +209,6 @@ client.on('messageCreate', async (message) => {
                 }
             }
 
-            // 2. Cek 10 Pesan Terakhir Jika Tidak Ketemu via Reply
             if (!targetUser) {
                 const recentMessages = await message.channel.messages.fetch({ limit: 10 }).catch(() => null);
                 if (recentMessages) {
@@ -452,4 +448,10 @@ client.on('interactionCreate', async (interaction) => {
         const embed = createSettingsEmbed(interaction.user, type);
         const components = createSettingsButtons(interaction.user, type);
 
-        return interaction.update({ e
+        return interaction.update({ embeds: [embed], components });
+    }
+});
+
+client.login(process.env.TOKEN);
+        
+}
