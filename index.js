@@ -9,6 +9,21 @@ const client = new Client({
     ] 
 });
 
+// 🎨 Daftar Warna Gradient Theme (Ungu, Merah Violet, Biru)
+const gradientColors = [
+    '#9B59B6', // Purple
+    '#8A2BE2', // Blue Violet
+    '#C71585', // Medium Violet Red
+    '#4B0082', // Indigo
+    '#7B68EE', // Medium Slate Blue
+    '#DDA0DD'  // Plum/Magenta Light
+];
+
+// Fungsi untuk ambil 1 warna acak dari tema Ungu-Merah-Biru
+function getRandomGradientColor() {
+    return gradientColors[Math.floor(Math.random() * gradientColors.length)];
+}
+
 // 📦 Settings Per Server
 const serverSettings = new Map();
 
@@ -26,7 +41,7 @@ function getServerConfig(guildId) {
     return serverSettings.get(guildId);
 }
 
-// 📦 Settings Per User (Mode dipisah untuk OWO, HUNT, dan PRAY)
+// 📦 Settings Per User
 const userSettings = new Map();
 
 function getUserConfig(userId) {
@@ -38,10 +53,9 @@ function getUserConfig(userId) {
             pingsEnabled: true,
             replyEnabled: true,
             
-            // 🎯 Mode dipisah per fitur!
-            owoMode: 'text',  // 'text' atau 'gif'
-            huntMode: 'text', // 'text' atau 'gif'
-            prayMode: 'text', // 'text' atau 'gif'
+            owoMode: 'text',
+            huntMode: 'text',
+            prayMode: 'text',
 
             owoGif: "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif",
             huntGif: "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif",
@@ -57,10 +71,10 @@ client.on('ready', () => {
     console.log(`✅ Bot ${client.user.tag} aktif & siap memantau!`);
 });
 
-// --- 🎨 EMBED UTAMA: HELP MENU ---
+// --- 🎨 EMBED HELP MENU ---
 function createHelpEmbed(guildName, avatarURL) {
     return new EmbedBuilder()
-        .setColor('#5865F2')
+        .setColor(getRandomGradientColor())
         .setAuthor({ name: '🏓 Reminders', iconURL: client.user.displayAvatarURL() })
         .setDescription(
             `Gunakan \`!pai help\` untuk melihat bantuan.\n\n` +
@@ -91,7 +105,7 @@ function createServerSettingsEmbed(guildId) {
     const config = getServerConfig(guildId);
 
     return new EmbedBuilder()
-        .setColor('#5865F2')
+        .setColor(getRandomGradientColor())
         .setTitle('Server Settings')
         .setDescription(
             `⚙️ **OwO bot prefix**\n\`\`\`\n${config.owoPrefix}\n\`\`\`\ndo \`owoprefix\` to update\n\n` +
@@ -111,7 +125,7 @@ function createSettingsEmbed(user, type) {
     let title = `${user.username}'s ${type === 'owoh' ? 'hunt/battle' : (type === 'owo' ? 'owo/uwu' : 'pray/curse')} reminder settings`;
 
     return new EmbedBuilder()
-        .setColor(isEnabled ? '#43B581' : '#F04747')
+        .setColor(isEnabled ? getRandomGradientColor() : '#F04747')
         .setAuthor({ name: title, iconURL: user.displayAvatarURL() })
         .setDescription(
             `${isEnabled ? '✅' : '❌'} **Is this reminder enabled?**\n\n` +
@@ -165,13 +179,12 @@ client.on('messageCreate', async (message) => {
     const serverCfg = getServerConfig(guildId);
     const userCfg = getUserConfig(userId);
 
-    // --- 🤖 DETEKSI PESAN DARI BOT (OwO / GoD Bot) ---
+    // Deteksi Pesan dari Bot OwO
     if (message.author.bot) {
         if (msgLower.includes("captcha") || msgLower.includes("verify")) {
             message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`);
         }
 
-        // Deteksi Huntbot "I WILL BE BACK IN ..."
         if (msgUpper.includes('I WILL BE BACK IN')) {
             const hoursMatch = msgUpper.match(/(\d+)\s*H/i);
             const minutesMatch = msgUpper.match(/(\d+)\s*M/i);
@@ -183,21 +196,41 @@ client.on('messageCreate', async (message) => {
             if (secondsMatch) totalMs += parseInt(secondsMatch[1]) * 1000;
 
             let targetUser = message.mentions.users.first();
+            let huntTypeLabel = "OWO HUNTBOT"; // Default nama
 
-            if (!targetUser && message.reference) {
+            // 1. Cek dari Reply Message
+            if (message.reference) {
                 const referencedMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
-                if (referencedMsg) targetUser = referencedMsg.author;
+                if (referencedMsg) {
+                    if (!targetUser) targetUser = referencedMsg.author;
+                    const refContent = referencedMsg.content.toLowerCase();
+                    if (refContent.includes('ghb') || refContent.includes('god')) {
+                        huntTypeLabel = "GOD HUNTBOT";
+                    } else {
+                        huntTypeLabel = "OWO HUNTBOT";
+                    }
+                }
             }
 
+            // 2. Cek 10 Pesan Terakhir Jika Tidak Ketemu via Reply
             if (!targetUser) {
                 const recentMessages = await message.channel.messages.fetch({ limit: 10 }).catch(() => null);
                 if (recentMessages) {
                     const lastUserMsg = recentMessages.find(m => !m.author.bot && (
                         m.content.toLowerCase().includes('hb') || 
                         m.content.toLowerCase().includes('ghb') || 
-                        m.content.toLowerCase().includes('whb')
+                        m.content.toLowerCase().includes('god') ||
+                        m.content.toLowerCase().includes('huntbot')
                     ));
-                    if (lastUserMsg) targetUser = lastUserMsg.author;
+                    if (lastUserMsg) {
+                        targetUser = lastUserMsg.author;
+                        const userCmd = lastUserMsg.content.toLowerCase();
+                        if (userCmd.includes('ghb') || userCmd.includes('god')) {
+                            huntTypeLabel = "GOD HUNTBOT";
+                        } else {
+                            huntTypeLabel = "OWO HUNTBOT";
+                        }
+                    }
                 }
             }
 
@@ -205,13 +238,13 @@ client.on('messageCreate', async (message) => {
                 const displayH = hoursMatch ? hoursMatch[1] : 0;
                 const displayM = minutesMatch ? minutesMatch[1] : 0;
 
-                message.channel.send(`⏰ **Pengingat Dipasang!** Aku bakal DM <@${targetUser.id}> dalam **${displayH} jam ${displayM} menit** lagi.`);
+                message.channel.send(`⏰ **Pengingat Dipasang!** Aku bakal DM <@${targetUser.id}> saat **${huntTypeLabel}** selesai dalam **${displayH} jam ${displayM} menit** lagi.`);
 
                 setTimeout(async () => {
                     try {
-                        await targetUser.send(`🔔 <@${targetUser.id}>, **HUNTBOT / AUTOHUNT SELESAI!** Waktunya cek huntbot kamu lagi!`);
+                        await targetUser.send(`🔔 <@${targetUser.id}>, **${huntTypeLabel} SELESAI!** Waktunya cek dan jalankan lagi! ⚔️`);
                     } catch (error) {
-                        message.channel.send(`🔔 <@${targetUser.id}>, **HUNTBOT / AUTOHUNT SELESAI!** (Gagal kirim DM karena DM ditutup).`);
+                        message.channel.send(`🔔 <@${targetUser.id}>, **${huntTypeLabel} SELESAI!** (Gagal kirim DM karena DM ditutup).`);
                     }
                 }, totalMs);
             }
@@ -219,7 +252,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // --- 🛠️ COMMAND HANDLER (!pai ...) ---
+    // --- 🛠️ COMMAND HANDLER ---
     let usedPrefix = null;
     if (msgLower.startsWith('!pai')) {
         usedPrefix = '!pai';
@@ -305,7 +338,7 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // --- 🎯 AUTOMATIC REMINDERS (15 DETIK / 5 MENIT) ---
+    // --- 🎯 AUTOMATIC REMINDERS ---
 
     // 1. owo / uwu (15 Detik)
     if ((msgLower === 'owo' || msgLower === 'uwu') && userCfg.owoEnabled) {
@@ -316,7 +349,10 @@ client.on('messageCreate', async (message) => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
             const payload = { content: `${mentionStr} ${serverCfg.owoMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
-            if (userCfg.owoMode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.owoGif)];
+            
+            if (userCfg.owoMode === 'gif') {
+                payload.embeds = [new EmbedBuilder().setColor(getRandomGradientColor()).setImage(userCfg.owoGif)];
+            }
 
             message.channel.send(payload).catch(() => {});
             activeTimers.delete(timerKey);
@@ -335,7 +371,10 @@ client.on('messageCreate', async (message) => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
             const payload = { content: `${mentionStr} ${serverCfg.huntMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
-            if (userCfg.huntMode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.huntGif)];
+            
+            if (userCfg.huntMode === 'gif') {
+                payload.embeds = [new EmbedBuilder().setColor(getRandomGradientColor()).setImage(userCfg.huntGif)];
+            }
 
             message.channel.send(payload).catch(() => {});
             activeTimers.delete(timerKey);
@@ -354,7 +393,10 @@ client.on('messageCreate', async (message) => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
             const payload = { content: `${mentionStr} ${serverCfg.prayMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
-            if (userCfg.prayMode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.prayGif)];
+            
+            if (userCfg.prayMode === 'gif') {
+                payload.embeds = [new EmbedBuilder().setColor(getRandomGradientColor()).setImage(userCfg.prayGif)];
+            }
 
             message.channel.send(payload).catch(() => {});
             activeTimers.delete(timerKey);
@@ -402,7 +444,6 @@ client.on('interactionCreate', async (interaction) => {
         } else if (key === 'reply') {
             config.replyEnabled = !config.replyEnabled;
         } else if (key === 'mode') {
-            // 🔄 Toggle mode spesifik sesuai dengan type menu yang dibuka!
             if (type === 'owo') config.owoMode = config.owoMode === 'text' ? 'gif' : 'text';
             if (type === 'owoh') config.huntMode = config.huntMode === 'text' ? 'gif' : 'text';
             if (type === 'owopray') config.prayMode = config.prayMode === 'text' ? 'gif' : 'text';
@@ -411,8 +452,4 @@ client.on('interactionCreate', async (interaction) => {
         const embed = createSettingsEmbed(interaction.user, type);
         const components = createSettingsButtons(interaction.user, type);
 
-        return interaction.update({ embeds: [embed], components });
-    }
-});
-
-client.login(process.env.TOKEN);
+        return interaction.update({ e
