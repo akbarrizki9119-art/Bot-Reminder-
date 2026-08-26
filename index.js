@@ -8,80 +8,114 @@ const client = new Client({
     ] 
 });
 
-const OWO_BOT_ID = "408785106942164992"; 
 const GOD_BOT_ID = "1521044059643318443"; 
 
-// --- ⚙️ SETTINGAN UTAMA ---
 let defaultTrigger = "!pai";
 let customPrefix = "";
-let isHuntEnabled = true;
-let isPrayEnabled = true;
-let isOwoCmdEnabled = true;
 
-// GIF Default
-const DEFAULT_GIF_HUNT = "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif";
-const DEFAULT_GIF_PRAY = "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif";
+// 📦 Settings Per User
+const userSettings = new Map();
 
-// 📦 Map Storage
-const userCustomHunt = new Map();
-const userCustomPray = new Map();
-const userReminderMode = new Map(); // 'gif' atau 'text'
+function getUserConfig(userId) {
+    if (!userSettings.has(userId)) {
+        userSettings.set(userId, {
+            huntEnabled: true,
+            prayEnabled: true,
+            owoEnabled: true,
+            pingsEnabled: true,
+            replyEnabled: true,
+            mode: 'text', // 'text' atau 'gif'
+            customHuntMsg: "hunt/battle 🎉",
+            customOwoMsg: "owo 🥳",
+            customGodMsg: "god ⚡",
+            customPrayMsg: "pray/curse 🙏",
+            huntGif: "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif",
+            prayGif: "https://cdn.discordapp.com/attachments/1511280356802957414/1540470284237410314/b8c64c28f86119317d2aa2ce417e4579.gif"
+        });
+    }
+    return userSettings.get(userId);
+}
 
-const lastHunterByChannel = new Map();
-const lastPrayerByChannel = new Map();
-const lastOwoUserByChannel = new Map();
+// Map timer aktif agar tidak duplikat
+const activeTimers = new Map();
 
 client.on('ready', () => {
     console.log(`✅ Bot ${client.user.tag} aktif & siap memantau!`);
 });
 
-// --- 🎨 EMBED HELP GENERATOR ---
-function createHelpEmbed(category, user) {
-    if (category === 'reminders') {
-        return new EmbedBuilder()
-            .setColor('#2B2D31')
-            .setAuthor({ name: '🏓 Reminders', iconURL: client.user.displayAvatarURL() })
-            .setDescription(`Gunakan \`!pai help\` untuk melihat bantuan.\n\n` +
-                `\`owo / god / owoh\`\n> Mengatur pengingat **owo / owoh / god** (15d) 🌿⚔️\n\n` +
-                `\`owopray\`\n> Mengatur pengingat **pray / curse** (5m) 🙏👻\n\n` +
-                `\`mode\`\n> Pilih tipe reminder: \`!pai mode gif\` atau \`!pai mode text\` 💬\n\n` +
-                `\`gif\`\n> Atur GIF kustom: \`!pai gif hunt <link>\` atau \`!pai gif pray <link>\` 🖼️\n\n` +
-                `\`godhb\`\n> Pengingat Otomatis Autohunt GoD bot via DM ⏰`
-            )
-            .setFooter({ text: 'Dibuat khusus untuk Server O P P A I', iconURL: user.displayAvatarURL() });
-    } else if (category === 'util') {
-        return new EmbedBuilder()
-            .setColor('#2B2D31')
-            .setAuthor({ name: '⚙️ Utilities', iconURL: client.user.displayAvatarURL() })
-            .setDescription(`\`!pai enable <hunt/pray/all>\` — Aktifkan reminder\n` +
-                `\`!pai disable <hunt/pray/all>\` — Matikan reminder\n` +
-                `\`!pai prefix <prefix_baru>\` — Ubah prefix kustom tambahan`
-            )
-            .setFooter({ text: 'Dibuat khusus untuk Server O P P A I', iconURL: user.displayAvatarURL() });
+// --- 🎨 EMBED & BUTTON SETTINGS GENERATOR ---
+function createSettingsEmbed(user, type) {
+    const config = getUserConfig(user.id);
+    let isEnabled = false;
+    let title = "";
+
+    if (type === 'owoh') {
+        isEnabled = config.huntEnabled;
+        title = `${user.username}'s hunt/battle reminder settings`;
+    } else if (type === 'owo') {
+        isEnabled = config.owoEnabled;
+        title = `${user.username}'s owo/uwu reminder settings`;
+    } else if (type === 'owopray') {
+        isEnabled = config.prayEnabled;
+        title = `${user.username}'s pray/curse reminder settings`;
     }
+
+    return new EmbedBuilder()
+        .setColor(isEnabled ? '#43B581' : '#F04747')
+        .setAuthor({ name: title, iconURL: user.displayAvatarURL() })
+        .setDescription(
+            `${isEnabled ? '✅' : '❌'} **Is this reminder enabled?**\n\n` +
+            `${config.pingsEnabled ? '✅' : '❌'} **Pings / mentions enabled?**\n` +
+            `${config.replyEnabled ? '✅' : '❌'} **Use inline replies?**\n` +
+            `💬 **Current Mode:** \`${config.mode.toUpperCase()}\`\n\n` +
+            `Gunakan \`!pai msg\` untuk mengganti teks/emoji.`
+        );
 }
 
-function createHelpButtons(activeCategory) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('help_reminders')
-            .setLabel('Reminders')
-            .setEmoji('🏓')
-            .setStyle(activeCategory === 'reminders' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId('help_util')
-            .setLabel('Util')
-            .setEmoji('⚙️')
-            .setStyle(activeCategory === 'util' ? ButtonStyle.Primary : ButtonStyle.Secondary)
-    );
+function createSettingsButtons(user, type) {
+    const config = getUserConfig(user.id);
+    let isEnabled = false;
+
+    if (type === 'owoh') isEnabled = config.huntEnabled;
+    if (type === 'owo') isEnabled = config.owoEnabled;
+    if (type === 'owopray') isEnabled = config.prayEnabled;
+
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`toggle_enable_${type}_${user.id}`)
+                .setLabel(type === 'owoh' ? 'hunt/battle' : type)
+                .setEmoji('⚔️')
+                .setStyle(isEnabled ? ButtonStyle.Success : ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`toggle_ping_${type}_${user.id}`)
+                .setLabel('ping')
+                .setEmoji('🔴')
+                .setStyle(config.pingsEnabled ? ButtonStyle.Success : ButtonStyle.Secondary)
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`toggle_reply_${type}_${user.id}`)
+                .setLabel('reply')
+                .setEmoji('↩️')
+                .setStyle(config.replyEnabled ? ButtonStyle.Success : ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`toggle_mode_${type}_${user.id}`)
+                .setLabel(`mode: ${config.mode}`)
+                .setEmoji('🖼️')
+                .setStyle(ButtonStyle.Primary)
+        )
+    ];
 }
 
-// --- 📩 MESSAGE CREATED EVENT ---
+// --- 📩 MESSAGE EVENT ---
 client.on('messageCreate', async (message) => {
-    if (message.author.id === client.user.id) return;
+    if (message.author.bot) return;
 
     const content = message.content.trim();
     const msgLower = content.toLowerCase();
+    const userId = message.author.id;
+    const config = getUserConfig(userId);
 
     let usedPrefix = null;
     if (msgLower.startsWith(defaultTrigger.toLowerCase())) {
@@ -90,26 +124,31 @@ client.on('messageCreate', async (message) => {
         usedPrefix = customPrefix;
     }
 
-    // --- 🛠️ COMMAND HANDLER ---
+    // --- 🛠️ COMMAND HANDLER (!pai ...) ---
     if (usedPrefix) {
         const args = content.slice(usedPrefix.length).trim().split(/ +/);
         const command = args.shift()?.toLowerCase();
-        const userId = message.author.id;
 
-        if (command === 'help') {
-            const embed = createHelpEmbed('reminders', message.author);
-            const row = createHelpButtons('reminders');
-            return message.channel.send({ embeds: [embed], components: [row] });
+        if (command === 'owoh' || command === 'owo' || command === 'owopray') {
+            const embed = createSettingsEmbed(message.author, command);
+            const components = createSettingsButtons(message.author, command);
+            return message.channel.send({ embeds: [embed], components });
         }
 
-        if (command === 'mode') {
-            const pilihan = args[0]?.toLowerCase();
-            if (pilihan === 'gif' || pilihan === 'text') {
-                userReminderMode.set(userId, pilihan);
-                return message.channel.send(`✅ Mode reminder diubah ke: **${pilihan.toUpperCase()}**!`);
-            } else {
-                return message.channel.send(`❌ Gunakan: \`!pai mode gif\` atau \`!pai mode text\``);
+        if (command === 'msg') {
+            const tipe = args.shift()?.toLowerCase();
+            const newMsg = args.join(" ");
+
+            if (!tipe || !newMsg) {
+                return message.channel.send(`❌ Format salah! Contoh: \`!pai msg owo owo <emoji>\``);
             }
+
+            if (tipe === 'owo') config.customOwoMsg = newMsg;
+            else if (tipe === 'god') config.customGodMsg = newMsg;
+            else if (tipe === 'hunt' || tipe === 'owoh') config.customHuntMsg = newMsg;
+            else if (tipe === 'pray' || tipe === 'owopray') config.customPrayMsg = newMsg;
+
+            return message.channel.send(`✅ Pesan pengingat **${tipe}** diubah menjadi: \`${newMsg}\``);
         }
 
         if (command === 'gif') {
@@ -118,119 +157,94 @@ client.on('messageCreate', async (message) => {
             if (!kategori || !linkGif || (!linkGif.startsWith('http://') && !linkGif.startsWith('https://'))) {
                 return message.channel.send(`❌ Format salah! Contoh: \`!pai gif hunt <link_gif>\``);
             }
-            if (kategori === 'hunt') {
-                userCustomHunt.set(userId, linkGif);
-                return message.channel.send(`✅ Custom GIF **Hunt** milik <@${userId}> disimpan!`);
-            } else if (kategori === 'pray') {
-                userCustomPray.set(userId, linkGif);
-                return message.channel.send(`✅ Custom GIF **Pray** milik <@${userId}> disimpan!`);
-            }
-        }
+            if (kategori === 'hunt' || kategori === 'owoh') config.huntGif = linkGif;
+            else if (kategori === 'pray' || kategori === 'owopray') config.prayGif = linkGif;
 
-        if (command === 'enable') {
-            const kat = args[0]?.toLowerCase();
-            if (kat === 'hunt') isHuntEnabled = true;
-            else if (kat === 'pray') isPrayEnabled = true;
-            else if (kat === 'all') { isHuntEnabled = true; isPrayEnabled = true; }
-            return message.channel.send(`🟢 Status Reminder di-enable!`);
-        }
-
-        if (command === 'disable') {
-            const kat = args[0]?.toLowerCase();
-            if (kat === 'hunt') isHuntEnabled = false;
-            else if (kat === 'pray') isPrayEnabled = false;
-            else if (kat === 'all') { isHuntEnabled = false; isPrayEnabled = false; }
-            return message.channel.send(`🔴 Status Reminder di-disable!`);
-        }
-
-        if (command === 'prefix') {
-            const newPrefix = args[0];
-            if (!newPrefix) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`!pai prefix .\``);
-            customPrefix = newPrefix;
-            return message.channel.send(`✅ Prefix kustom diatur ke \`${customPrefix}\`!`);
+            return message.channel.send(`✅ GIF **${kategori}** berhasil diperbarui!`);
         }
     }
 
-    // --- 🎯 DETEKSI COMMAND DARI USER ---
-    if (msgLower === 'wh' || msgLower === 'owo hunt' || msgLower.startsWith('owo h ') || msgLower.startsWith('wh ')) {
-        lastHunterByChannel.set(message.channel.id, message.author.id);
+    // --- 🎯 REMINDER MASING-MASING (SEPARATE & ACCURATE) ---
+
+    // 1. Khusus OWO / UWU saja (15 Detik)
+    if ((msgLower === 'owo' || msgLower === 'uwu') && config.owoEnabled) {
+        const timerKey = `${userId}_owo_${message.channel.id}`;
+        if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
+
+        const timer = setTimeout(() => {
+            const mentionStr = config.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
+            const payload = { content: `${mentionStr} ${config.customOwoMsg}` };
+            if (config.replyEnabled) payload.reply = { messageReference: message.id };
+            if (config.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(config.huntGif)];
+
+            message.channel.send(payload).catch(() => {});
+            activeTimers.delete(timerKey);
+        }, 15000);
+
+        activeTimers.set(timerKey, timer);
+        return;
     }
 
-    // NEW: Deteksi khusus command "owo" dan "god"
-    if (msgLower === 'owo' || msgLower === 'god' || msgLower === 'uwu') {
-        lastOwoUserByChannel.set(message.channel.id, message.author.id);
+    // 2. Khusus GOD saja (15 Detik)
+    if (msgLower === 'god' && config.owoEnabled) {
+        const timerKey = `${userId}_god_${message.channel.id}`;
+        if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
+
+        const timer = setTimeout(() => {
+            const mentionStr = config.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
+            const payload = { content: `${mentionStr} ${config.customGodMsg}` };
+            if (config.replyEnabled) payload.reply = { messageReference: message.id };
+            if (config.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(config.huntGif)];
+
+            message.channel.send(payload).catch(() => {});
+            activeTimers.delete(timerKey);
+        }, 15000);
+
+        activeTimers.set(timerKey, timer);
+        return;
     }
 
-    if (msgLower.includes('wpray') || msgLower.includes('owo pray') || msgLower === 'wp' || msgLower === 'pr') {
-        lastPrayerByChannel.set(message.channel.id, message.author.id);
+    // 3. Khusus HUNT / BATTLE saja (15 Detik)
+    if ((msgLower === 'wh' || msgLower === 'owo hunt' || msgLower.startsWith('wh ') || msgLower.startsWith('owo h ')) && config.huntEnabled) {
+        const timerKey = `${userId}_hunt_${message.channel.id}`;
+        if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
+
+        const timer = setTimeout(() => {
+            const mentionStr = config.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
+            const payload = { content: `${mentionStr} ${config.customHuntMsg}` };
+            if (config.replyEnabled) payload.reply = { messageReference: message.id };
+            if (config.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(config.huntGif)];
+
+            message.channel.send(payload).catch(() => {});
+            activeTimers.delete(timerKey);
+        }, 15000);
+
+        activeTimers.set(timerKey, timer);
+        return;
     }
 
-    // --- 🔔 DETEKSI BOT RESPON (OWO BOT & REACTION BOT) ---
-    if (message.author.id === OWO_BOT_ID || message.author.username.toLowerCase().includes('reaction')) {
-        
-        // 1. Reminder Hunt / Owo / God (15 Detik)
-        if (isHuntEnabled) {
-            const isHuntMsg = message.content.includes("hunted") || message.content.includes("caught") || message.content.includes("found");
-            const isOwoMsg = message.content.toLowerCase().includes("owo") || message.content.toLowerCase().includes("hunt");
+    // 4. Khusus PRAY / CURSE saja (5 Menit / 300000 ms)
+    if ((msgLower.includes('wpray') || msgLower.includes('owo pray') || msgLower === 'wp' || msgLower === 'pr') && config.prayEnabled) {
+        const timerKey = `${userId}_pray_${message.channel.id}`;
+        if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
 
-            if (isHuntMsg || isOwoMsg) {
-                const targetUser = message.mentions.users.first()?.id 
-                    || lastHunterByChannel.get(message.channel.id)
-                    || lastOwoUserByChannel.get(message.channel.id);
+        const timer = setTimeout(() => {
+            const mentionStr = config.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
+            const payload = { content: `${mentionStr} ${config.customPrayMsg}` };
+            if (config.replyEnabled) payload.reply = { messageReference: message.id };
+            if (config.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(config.prayGif)];
 
-                if (targetUser) {
-                    // Hapus dari tracker biar ga double
-                    lastHunterByChannel.delete(message.channel.id);
-                    lastOwoUserByChannel.delete(message.channel.id);
+            message.channel.send(payload).catch(() => {});
+            activeTimers.delete(timerKey);
+        }, 300000);
 
-                    setTimeout(() => {
-                        const userMode = userReminderMode.get(targetUser) || 'gif';
-
-                        if (userMode === 'text') {
-                            message.channel.send({ content: `🔔 <@${targetUser}> , waktunya untuk **owo / hunt**!` });
-                        } else {
-                            const userGif = userCustomHunt.get(targetUser) || DEFAULT_GIF_HUNT;
-                            const embedHunt = new EmbedBuilder().setColor('#2B2D31').setImage(userGif);
-
-                            message.channel.send({ 
-                                content: `🔔 <@${targetUser}> , waktunya untuk **owo / hunt**!`, 
-                                embeds: [embedHunt] 
-                            });
-                        }
-                    }, 15000); 
-                }
-            }
-        }
-
-        // 2. Reminder Pray (5 Menit)
-        const owoText = message.content.toLowerCase();
-        if (isPrayEnabled && (owoText.includes("prayed") || owoText.includes("blessed") || owoText.includes("cursed") || owoText.includes("luck point") || owoText.includes("pray"))) {
-            const prayerToMention = message.mentions.users.first()?.id 
-                || lastPrayerByChannel.get(message.channel.id);
-
-            if (prayerToMention) {
-                lastPrayerByChannel.delete(message.channel.id);
-
-                setTimeout(() => {
-                    const userMode = userReminderMode.get(prayerToMention) || 'gif';
-
-                    if (userMode === 'text') {
-                        message.channel.send({ content: `🔔 <@${prayerToMention}> , waktunya untuk **wpray**!` });
-                    } else {
-                        const userGif = userCustomPray.get(prayerToMention) || DEFAULT_GIF_PRAY;
-                        const embedPray = new EmbedBuilder().setColor('#2B2D31').setImage(userGif);
-
-                        message.channel.send({ 
-                            content: `🔔 <@${prayerToMention}> , waktunya untuk **wpray**!`, 
-                            embeds: [embedPray] 
-                        });
-                    }
-                }, 300000); 
-            }
-        }
+        activeTimers.set(timerKey, timer);
+        return;
     }
+});
 
-    // --- 🤖 REMINDER GOD BOT VIA DM ---
+// --- 🤖 REMINDER AUTOHUNT GOD BOT VIA DM ---
+client.on('messageCreate', async (message) => {
     if (message.author.id === GOD_BOT_ID || message.author.username.includes('GoD')) {
         if (message.content.includes("captcha") || message.content.includes("verify")) {
             message.channel.send(`🚨 **PERINGATAN GOD:** Ada Captcha/Verifikasi! Cek sekarang!`);
@@ -257,7 +271,7 @@ client.on('messageCreate', async (message) => {
                     try {
                         await targetUser.send(`🔔 **AUTOHUNT GOD SELESAI!** Waktunya ketik \`ghb 1d\` lagi di server!`);
                     } catch (error) {
-                        message.channel.send(`🔔 <@${targetUser.id}> **AUTOHUNT GOD SELESAI!** (Gagal kirim DM, cek apakah DM server aktif).`);
+                        message.channel.send(`🔔 <@${targetUser.id}> **AUTOHUNT GOD SELESAI!**`);
                     }
                 }, totalMs);
             }
@@ -265,20 +279,35 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- 🔘 BUTTON INTERACTION HANDLER ---
+// --- 🔘 INTERACTION BUTTON HANDLER ---
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
-    if (interaction.customId === 'help_reminders') {
-        const embed = createHelpEmbed('reminders', interaction.user);
-        const row = createHelpButtons('reminders');
-        await interaction.update({ embeds: [embed], components: [row] });
-    } else if (interaction.customId === 'help_util') {
-        const embed = createHelpEmbed('util', interaction.user);
-        const row = createHelpButtons('util');
-        await interaction.update({ embeds: [embed], components: [row] });
+    const [action, key, type, ownerId] = interaction.customId.split('_');
+
+    if (action === 'toggle' && interaction.user.id === ownerId) {
+        const config = getUserConfig(ownerId);
+
+        if (key === 'enable') {
+            if (type === 'owoh') config.huntEnabled = !config.huntEnabled;
+            if (type === 'owo') config.owoEnabled = !config.owoEnabled;
+            if (type === 'owopray') config.prayEnabled = !config.prayEnabled;
+        } else if (key === 'ping') {
+            config.pingsEnabled = !config.pingsEnabled;
+        } else if (key === 'reply') {
+            config.replyEnabled = !config.replyEnabled;
+        } else if (key === 'mode') {
+            config.mode = config.mode === 'text' ? 'gif' : 'text';
+        }
+
+        const embed = createSettingsEmbed(interaction.user, type);
+        const components = createSettingsButtons(interaction.user, type);
+
+        await interaction.update({ embeds: [embed], components });
+    } else if (action === 'toggle' && interaction.user.id !== ownerId) {
+        await interaction.reply({ content: '❌ Ini bukan panel setting milikmu!', ephemeral: true });
     }
 });
 
 client.login(process.env.TOKEN);
-                       
+                          
