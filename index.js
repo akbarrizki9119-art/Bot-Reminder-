@@ -9,8 +9,6 @@ const client = new Client({
     ] 
 });
 
-const GOD_BOT_ID = "1521044059643318443"; 
-
 // 📦 Settings Per Server
 const serverSettings = new Map();
 
@@ -174,14 +172,14 @@ client.on('messageCreate', async (message) => {
     const serverCfg = getServerConfig(guildId);
     const userCfg = getUserConfig(userId);
 
-    // --- 🤖 DETEKSI BOT (OwO Bot / GoD Bot / Auto-Huntbot) ---
+    // --- 🤖 DETEKSI PESAN DARI BOT (OwO / GoD Bot) ---
     if (message.author.bot) {
         // Warning Captcha dari Bot
         if (msgLower.includes("captcha") || msgLower.includes("verify")) {
             message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`);
         }
 
-        // Deteksi pesan timer Huntbot: "I WILL BE BACK IN 3H 3M" (Baik dari OwO Bot maupun GoD Bot)
+        // Deteksi pesan timer Huntbot: "I WILL BE BACK IN ..."
         if (msgUpper.includes('I WILL BE BACK IN')) {
             const hoursMatch = msgUpper.match(/(\d+)\s*H/i);
             const minutesMatch = msgUpper.match(/(\d+)\s*M/i);
@@ -192,30 +190,47 @@ client.on('messageCreate', async (message) => {
             if (minutesMatch) totalMs += parseInt(minutesMatch[1]) * 60 * 1000;
             if (secondsMatch) totalMs += parseInt(secondsMatch[1]) * 1000;
 
-            // Cari User target (User yang di-mention atau balasan reply)
+            // 🔍 Cari Siapa User Target:
             let targetUser = message.mentions.users.first();
+
+            // Jika tidak ada mention, cek reference/reply
             if (!targetUser && message.reference) {
                 const referencedMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
                 if (referencedMsg) targetUser = referencedMsg.author;
+            }
+
+            // Jika masih tidak ketemu, cari user non-bot terakhir yang mengetik ghb / whb di channel ini
+            if (!targetUser) {
+                const recentMessages = await message.channel.messages.fetch({ limit: 10 }).catch(() => null);
+                if (recentMessages) {
+                    const lastUserMsg = recentMessages.find(m => !m.author.bot && (
+                        m.content.toLowerCase().includes('hb') || 
+                        m.content.toLowerCase().includes('ghb') || 
+                        m.content.toLowerCase().includes('whb')
+                    ));
+                    if (lastUserMsg) targetUser = lastUserMsg.author;
+                }
             }
 
             if (totalMs > 0 && targetUser) {
                 const displayH = hoursMatch ? hoursMatch[1] : 0;
                 const displayM = minutesMatch ? minutesMatch[1] : 0;
 
-                message.channel.send(`⏰ **Pengingat Huntbot Dipasang!** Aku bakal DM <@${targetUser.id}> dalam **${displayH}j ${displayM}m** lagi.`);
+                // 📌 Kirim Pesan Konfirmasi di Channel (Persis seperti Screenshot 2)
+                message.channel.send(`⏰ **Pengingat Dipasang!** Aku bakal DM <@${targetUser.id}> dalam **${displayH} jam ${displayM} menit** lagi.`);
 
+                // ⏳ Pasang Timer Pengingat
                 setTimeout(async () => {
                     try {
-                        await targetUser.send(`🔔 **HUNTBOT / AUTOHUNT SELESAI!** Waktunya cek huntbot kamu lagi!`);
+                        await targetUser.send(`🔔 <@${targetUser.id}>, **HUNTBOT / AUTOHUNT SELESAI!** Waktunya cek huntbot kamu lagi!`);
                         console.log(`✅ DM Huntbot terkirim ke ${targetUser.tag}`);
                     } catch (error) {
-                        message.channel.send(`🔔 <@${targetUser.id}> **HUNTBOT / AUTOHUNT SELESAI!** (Gagal kirim DM karena DM kamu ditutup).`);
+                        message.channel.send(`🔔 <@${targetUser.id}>, **HUNTBOT / AUTOHUNT SELESAI!** (Gagal kirim DM karena DM ditutup).`);
                     }
                 }, totalMs);
             }
         }
-        return; // Hentikan proses jika pesan dari bot
+        return; // Hentikan proses pesan bot di sini
     }
 
     // --- 🛠️ COMMAND HANDLER (!pai ...) ---
@@ -316,14 +331,14 @@ client.on('messageCreate', async (message) => {
 
     // --- 🎯 AUTOMATIC REMINDERS (15 DETIK / 5 MENIT) ---
 
-    // 1. owo / uwu (DIBERIKAN SPASI BERSIH: <@user> + " " + text)
+    // 1. owo / uwu
     if ((msgLower === 'owo' || msgLower === 'uwu') && userCfg.owoEnabled) {
         const timerKey = `${userId}_owo_${message.channel.id}`;
         if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
 
         const timer = setTimeout(() => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
-            const payload = { content: `${mentionStr} ${serverCfg.owoMsg}` }; // 👈 Diberi spasi agar tidak mepet
+            const payload = { content: `${mentionStr} ${serverCfg.owoMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
             if (userCfg.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.huntGif)];
 
@@ -342,7 +357,7 @@ client.on('messageCreate', async (message) => {
 
         const timer = setTimeout(() => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
-            const payload = { content: `${mentionStr} ${serverCfg.huntMsg}` }; // 👈 Diberi spasi agar tidak mepet
+            const payload = { content: `${mentionStr} ${serverCfg.huntMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
             if (userCfg.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.huntGif)];
 
@@ -361,7 +376,7 @@ client.on('messageCreate', async (message) => {
 
         const timer = setTimeout(() => {
             const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
-            const payload = { content: `${mentionStr} ${serverCfg.prayMsg}` }; // 👈 Diberi spasi agar tidak mepet
+            const payload = { content: `${mentionStr} ${serverCfg.prayMsg}` };
             if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
             if (userCfg.mode === 'gif') payload.embeds = [new EmbedBuilder().setColor('#2B2D31').setImage(userCfg.prayGif)];
 
@@ -422,4 +437,4 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(process.env.TOKEN);
-        
+                          
