@@ -115,7 +115,9 @@ function createServerSettingsEmbed(guildId) {
             `🌱 **hunt/battle reminder**\n\`${config.botPrefix} s hunt <pesan>\` to update\n\`{USER} ${config.huntMsg}\`\n\n` +
             `☘️ **pray/curse reminder**\n\`${config.botPrefix} s pray <pesan>\` to update\n\`{USER} ${config.prayMsg}\``
         );
-    // --- 🎨 EMBED USER SETTINGS ---
+}
+
+// --- 🎨 EMBED USER SETTINGS ---
 function createSettingsEmbed(user, type) {
     const config = getUserConfig(user.id);
     let isEnabled = type === 'owoh' ? config.huntEnabled : (type === 'owo' ? config.owoEnabled : config.prayEnabled);
@@ -452,6 +454,4 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-client.login(process.env.TOKEN);
-        
-}
+// GANTI process.env.TOKEN DENGAN TOKEN BOT-MU JIKA TIDAK MEMAKAI FILE .ENV / REPLI
