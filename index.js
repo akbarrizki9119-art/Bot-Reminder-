@@ -62,16 +62,16 @@ client.on('ready', () => {
 });
 
 // --- 🎨 EMBED HELP & SETTINGS ---
-function createHelpEmbed(guildName, avatarURL) {
+function createHelpEmbed(guildName, avatarURL, prefix) {
     return new EmbedBuilder()
         .setColor(getRandomColor())
         .setAuthor({ name: '🏓 Reminders Menu', iconURL: client.user.displayAvatarURL() })
         .setDescription(
-            `Gunakan \`!pai help\` untuk melihat bantuan.\n\n` +
-            `\`owo\`\nDo \`!pai owo\` to manage **owo/uwu** 🌿\n\n` +
-            `\`owoh\`\nDo \`!pai owoh\` to manage **hunt (wh/gh)** 🏹\n\n` +
-            `\`owob\`\nDo \`!pai owob\` to manage **battle (wb/gb)** ⚔️\n\n` +
-            `\`owopray\`\nDo \`!pai owopray\` to manage **pray/curse** 🙏`
+            `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
+            `\`owo\`\nDo \`${prefix} owo\` to manage **owo/uwu** 🌿\n\n` +
+            `\`owoh\`\nDo \`${prefix} owoh\` to manage **hunt (wh/gh)** 🏹\n\n` +
+            `\`owob\`\nDo \`${prefix} owob\` to manage **battle (wb/gb)** ⚔️\n\n` +
+            `\`owopray\`\nDo \`${prefix} owopray\` to manage **pray/curse** 🙏`
         )
         .setFooter({ text: `Server ${guildName || 'OPPAI'}`, iconURL: avatarURL || client.user.displayAvatarURL() });
 }
@@ -107,7 +107,7 @@ function createSettingsEmbed(user, type) {
 
     return new EmbedBuilder()
         .setColor(isEnabled ? getRandomColor() : '#F04747')
-        .setAuthor({ name: `${user.username}'s ${type} settings`, iconURL: user.displayAvatarURL() })
+        .setAuthor({ name: `${user.username}'s${type} settings`, iconURL: user.displayAvatarURL() })
         .setDescription(
             `${isEnabled ? '✅' : '❌'} **Reminder Enabled?**\n` +
             `${config.pingsEnabled ? '✅' : '❌'} **Pings Enabled?**\n` +
@@ -158,9 +158,25 @@ client.on('messageCreate', async (message) => {
                 const secondsMatch = msgUpper.match(/(\d+)\s*S/i);
 
                 let totalMs = 0;
-                if (hoursMatch) totalMs += parseInt(hoursMatch[1]) * 3600000;
-                if (minutesMatch) totalMs += parseInt(minutesMatch[1]) * 60000;
-                if (secondsMatch) totalMs += parseInt(secondsMatch[1]) * 1000;
+                let durationParts = [];
+
+                if (hoursMatch) {
+                    const h = parseInt(hoursMatch[1]);
+                    totalMs += h * 3600000;
+                    durationParts.push(`${h} Jam`);
+                }
+                if (minutesMatch) {
+                    const m = parseInt(minutesMatch[1]);
+                    totalMs += m * 60000;
+                    durationParts.push(`${m} Menit`);
+                }
+                if (secondsMatch) {
+                    const s = parseInt(secondsMatch[1]);
+                    totalMs += s * 1000;
+                    durationParts.push(`${s} Detik`);
+                }
+
+                const durationString = durationParts.join(' ') || 'beberapa saat';
 
                 let targetUser = message.mentions.users.first();
                 let huntTypeLabel = "OWO HUNTBOT";
@@ -187,12 +203,16 @@ client.on('messageCreate', async (message) => {
                 }
 
                 if (totalMs > 0 && targetUser) {
-                    message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!`).catch(() => {});
+                    // Notifikasi di channel dengan rincian waktu sisa
+                    message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\``).catch(() => {});
+                    
                     setTimeout(async () => {
                         try {
+                            // Kirim DM ke User
                             await targetUser.send(`🔔 <@${targetUser.id}>, **${huntTypeLabel} SELESAI!** Waktunya cek lagi! ⚔️`);
                         } catch (e) {
-                            message.channel.send(`🔔 <@${targetUser.id}>, **${huntTypeLabel} SELESAI!** (DM tertutup)`).catch(() => {});
+                            // Jika DM tertutup, kirim pengingat di channel
+                            message.channel.send(`🔔 <@${targetUser.id}>, **${huntTypeLabel} SELESAI!** (DM kamu tertutup)`).catch(() => {});
                         }
                     }, totalMs);
                 }
@@ -202,21 +222,36 @@ client.on('messageCreate', async (message) => {
 
         // --- 🛠️ COMMAND HANDLER ---
         let usedPrefix = null;
-        if (msgLower.startsWith('!pai')) usedPrefix = '!pai';
-        else if (serverCfg.botPrefix && msgLower.startsWith(serverCfg.botPrefix.toLowerCase())) usedPrefix = serverCfg.botPrefix;
+        if (msgLower.startsWith('!pai')) {
+            usedPrefix = '!pai';
+        } else if (serverCfg.botPrefix && msgLower.startsWith(serverCfg.botPrefix.toLowerCase())) {
+            usedPrefix = serverCfg.botPrefix;
+        }
 
         if (usedPrefix) {
             const args = content.slice(usedPrefix.length).trim().split(/ +/);
             const command = args.shift()?.toLowerCase();
 
             if (!command || command === 'help') {
-                return message.channel.send({ embeds: [createHelpEmbed(message.guild?.name, message.author.displayAvatarURL())], components: [createHelpButtons()] });
+                return message.channel.send({ embeds: [createHelpEmbed(message.guild?.name, message.author.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
             }
             if (command === 'settings') return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
             if (command === 's' || command === 'set') {
                 const subCmd = args.shift()?.toLowerCase();
                 const newMsg = args.join(" ");
+
+                if (subCmd === 'prefix') {
+                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} s prefix .\``);
+                    serverCfg.botPrefix = args[0];
+                    return message.channel.send(`✅ Bot prefix berhasil diubah menjadi \`${serverCfg.botPrefix}\``);
+                }
+                if (subCmd === 'owoprefix') {
+                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} s owoprefix w\``);
+                    serverCfg.owoPrefix = args[0];
+                    return message.channel.send(`✅ OwO prefix berhasil diubah menjadi \`${serverCfg.owoPrefix}\``);
+                }
+
                 if (subCmd === 'hunt') { serverCfg.huntMsg = newMsg; return message.channel.send(`✅ Updated **hunt** msg.`); }
                 if (subCmd === 'battle') { serverCfg.battleMsg = newMsg; return message.channel.send(`✅ Updated **battle** msg.`); }
                 if (subCmd === 'owo') { serverCfg.owoMsg = newMsg; return message.channel.send(`✅ Updated **owo** msg.`); }
@@ -239,14 +274,14 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // --- 🎯 AUTOMATIC REMINDERS WITH EMBED COLOR & GIF ---
+        // --- 🎯 AUTOMATIC REMINDERS ---
         const handleTimer = (type, timeMs, textMsg, modeKey, gifUrl) => {
             const timerKey = `${userId}_${type}_${message.channel.id}`;
             if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
 
             const timer = setTimeout(() => {
                 const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
-                const payload = { content: `${mentionStr} ${textMsg}` };
+                const payload = { content: `${mentionStr}${textMsg}` };
                 
                 if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
                 
@@ -271,21 +306,18 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
-        // 2. HUNT: wh / gh / owo hunt / owo h (15 Detik)
+        // 2. HUNT + BATTLE (15 Detik)
         const isHunt = ['wh', 'gh', 'owo hunt', 'owo h'].includes(msgLower) || msgLower.startsWith('wh ') || msgLower.startsWith('gh ') || msgLower.startsWith('owo h ');
         if (isHunt && userCfg.huntEnabled) {
-            handleTimer('hunt', 15000, serverCfg.huntMsg, 'huntMode', userCfg.huntGif);
+            let combinedMsg = serverCfg.huntMsg;
+            if (userCfg.battleEnabled) {
+                combinedMsg += ` & ${serverCfg.battleMsg}`;
+            }
+            handleTimer('hunt', 15000, combinedMsg, 'huntMode', userCfg.huntGif);
             return;
         }
 
-        // 3. BATTLE: wb / gb / owo battle / owo b (15 Detik)
-        const isBattle = ['wb', 'gb', 'owo battle', 'owo b', 'owob'].includes(msgLower) || msgLower.startsWith('wb ') || msgLower.startsWith('gb ') || msgLower.startsWith('owo b ');
-        if (isBattle && userCfg.battleEnabled) {
-            handleTimer('battle', 15000, serverCfg.battleMsg, 'battleMode', userCfg.battleGif);
-            return;
-        }
-
-        // 4. PRAY / CURSE (5 Menit)
+        // 3. PRAY / CURSE (5 Menit)
         const isPray = msgLower.includes('wpray') || msgLower.includes('owo pray') || msgLower === 'wp' || msgLower === 'pr';
         if (isPray && userCfg.prayEnabled) {
             handleTimer('pray', 300000, serverCfg.prayMsg, 'prayMode', userCfg.prayGif);
@@ -302,12 +334,14 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
         const parts = interaction.customId.split('_');
+        const guildId = interaction.guild?.id || 'dm';
+        const serverCfg = getServerConfig(guildId);
 
         if (interaction.customId === 'help_reminders') {
-            return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL())], components: [createHelpButtons()] });
+            return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
         }
         if (interaction.customId === 'help_settings') {
-            return interaction.update({ embeds: [createServerSettingsEmbed(interaction.guild?.id || 'dm')], components: [createHelpButtons()] });
+            return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
         }
 
         if (parts[0] === 'toggle') {
@@ -331,4 +365,3 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(process.env.TOKEN);
-            
