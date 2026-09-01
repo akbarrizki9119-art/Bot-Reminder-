@@ -236,7 +236,9 @@ client.on('messageCreate', async (message) => {
                 }
             }
             return;
-               // --- 🛠️ COMMAND HANDLER ---
+        }
+
+        // --- 🛠️ COMMAND HANDLER ---
         let usedPrefix = null;
         if (msgLower.startsWith('!pai')) {
             usedPrefix = '!pai';
@@ -480,6 +482,3 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(process.env.TOKEN);
-
-}
-    
