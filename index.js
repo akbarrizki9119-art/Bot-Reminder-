@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 
 const client = new Client({ 
     intents: [
@@ -65,13 +65,21 @@ client.on('ready', () => {
 function createHelpEmbed(guildName, avatarURL, prefix) {
     return new EmbedBuilder()
         .setColor(getRandomColor())
-        .setAuthor({ name: '🏓 Reminders Menu', iconURL: client.user.displayAvatarURL() })
+        .setAuthor({ name: '🏓 Reminders & Utility Menu', iconURL: client.user.displayAvatarURL() })
         .setDescription(
             `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
-            `\`owo\`\nDo \`${prefix} owo\` to manage **owo/uwu** 🌿\n\n` +
-            `\`owoh\`\nDo \`${prefix} owoh\` to manage **hunt (wh)** 🏹\n\n` +
-            `\`godh\`\nDo \`${prefix} godh\` to manage **god hunt (gh)** ⚡\n\n` +
-            `\`owopray\`\nDo \`${prefix} owopray\` to manage **pray/curse** 🙏`
+            `**🎮 GAME REMINDERS**\n` +
+            `\`${prefix} owo\` : Manage **owo/uwu** 🌿\n` +
+            `\`${prefix} owoh\` : Manage **hunt (wh)** 🏹\n` +
+            `\`${prefix} godh\` : Manage **god hunt (gh)** ⚡\n` +
+            `\`${prefix} owopray\` : Manage **pray/curse** 🙏\n\n` +
+            `**🛠️ UTILITY COMMANDS**\n` +
+            `\`${prefix} ping\` : Cek latency bot\n` +
+            `\`${prefix} clear <1-100>\` : Clear chat spam\n` +
+            `\`${prefix} user [@user]\` : Cek info akun\n` +
+            `\`${prefix} uptime\` : Cek berapa lama bot nyala\n` +
+            `\`${prefix} server\` : Cek info server\n` +
+            `\`${prefix} avatar [@user]\` : Ambil foto profil HD`
         )
         .setFooter({ text: `Server ${guildName || 'OPPAI'}`, iconURL: avatarURL || client.user.displayAvatarURL() });
 }
@@ -79,6 +87,7 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
 function createHelpButtons() {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('help_reminders').setLabel('Reminders').setEmoji('🏓').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('help_utility').setLabel('Utilitas').setEmoji('🛠️').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('help_settings').setLabel('Settings').setEmoji('⚙️').setStyle(ButtonStyle.Secondary)
     );
 }
@@ -146,12 +155,15 @@ client.on('messageCreate', async (message) => {
         const serverCfg = getServerConfig(guildId);
         const userCfg = getUserConfig(userId);
 
-        // --- 🤖 AUTO HUNT BOT DETECT & CAPTCHA ---
+        // --- 🤖 DETEKSI PESAN DARI BOT (OwO Bot / God Bot) ---
         if (message.author.bot) {
+            
+            // 1. Deteksi Captcha / Verification
             if (msgLower.includes("captcha") || msgLower.includes("verify")) {
                 message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`).catch(() => {});
             }
 
+            // 2. DETEKSI AUTOHUNT BOT (I WILL BE BACK IN)
             if (msgUpper.includes('I WILL BE BACK IN')) {
                 const hoursMatch = msgUpper.match(/(\d+)\s*H/i);
                 const minutesMatch = msgUpper.match(/(\d+)\s*M/i);
@@ -181,23 +193,27 @@ client.on('messageCreate', async (message) => {
                 let targetUser = message.mentions.users.first();
                 let huntTypeLabel = "OWO HUNTBOT";
 
-                if (message.reference) {
+                // A. Cek dari reply pesan
+                if (!targetUser && message.reference) {
                     const refMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
-                    if (refMsg) {
-                        if (!targetUser) targetUser = refMsg.author;
-                        if (refMsg.content.toLowerCase().includes('ghb')) huntTypeLabel = "GOD HUNTBOT";
+                    if (refMsg && !refMsg.author.bot) {
+                        targetUser = refMsg.author;
+                        if (refMsg.content.toLowerCase().includes('ghb') || refMsg.content.toLowerCase().includes('gah')) huntTypeLabel = "GOD HUNTBOT";
                     }
                 }
 
+                // B. Cari pesan user paling akhir sebelum respon OwO bot ini
                 if (!targetUser) {
-                    const recentMsgs = await message.channel.messages.fetch({ limit: 10 }).catch(() => null);
+                    const recentMsgs = await message.channel.messages.fetch({ limit: 6 }).catch(() => null);
                     if (recentMsgs) {
-                        const lastUserMsg = recentMsgs.find(m => !m.author.bot && (
-                            m.content.toLowerCase().includes('hb') || m.content.toLowerCase().includes('ghb')
-                        ));
+                        const huntKeywords = ['hb', 'ghb', 'whb', 'ah', 'w ah', 'autohunt', 'gah'];
+                        const lastUserMsg = recentMsgs.find(m => !m.author.bot && huntKeywords.some(kw => m.content.toLowerCase().includes(kw)));
+                        
                         if (lastUserMsg) {
                             targetUser = lastUserMsg.author;
-                            if (lastUserMsg.content.toLowerCase().includes('ghb')) huntTypeLabel = "GOD HUNTBOT";
+                            if (lastUserMsg.content.toLowerCase().includes('ghb') || lastUserMsg.content.toLowerCase().includes('gah')) {
+                                huntTypeLabel = "GOD HUNTBOT";
+                            }
                         }
                     }
                 }
@@ -207,17 +223,20 @@ client.on('messageCreate', async (message) => {
                     
                     setTimeout(async () => {
                         try {
-                            await targetUser.send(`🔔 <@${targetUser.id}>, **${huntTypeLabel} SELESAI!** Waktunya cek lagi! ⚔️`);
+                            // PING VIA DM (Memakai allowedMentions agar bersuara)
+                            await targetUser.send({
+                                content: `🔔 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** Waktunya cek / hunt lagi! ⚔️`,
+                                allowedMentions: { users: [targetUser.id] }
+                            });
                         } catch (e) {
-                            message.channel.send(`🔔 <@${targetUser.id}>, **${huntTypeLabel} SELESAI!** (DM kamu tertutup)`).catch(() => {});
+                            // Jika DM tertutup, ping di channel
+                            message.channel.send(`🚨 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** (DM kamu tertutup)`).catch(() => {});
                         }
                     }, totalMs);
                 }
             }
             return;
-        }
-
-        // --- 🛠️ COMMAND HANDLER ---
+               // --- 🛠️ COMMAND HANDLER ---
         let usedPrefix = null;
         if (msgLower.startsWith('!pai')) {
             usedPrefix = '!pai';
@@ -234,6 +253,7 @@ client.on('messageCreate', async (message) => {
             }
             if (command === 'settings') return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
+            // --- ⚙️ SERVER SETTINGS ---
             if (command === 's' || command === 'set') {
                 const subCmd = args.shift()?.toLowerCase();
                 const newMsg = args.join(" ");
@@ -268,6 +288,85 @@ client.on('messageCreate', async (message) => {
                 else if (kategori === 'godh' || kategori === 'god' || kategori === 'gh') userCfg.godGif = linkGif;
                 else if (kategori === 'pray' || kategori === 'owopray') userCfg.prayGif = linkGif;
                 return message.channel.send(`✅ GIF **${kategori}** diperbarui!`);
+            }
+
+            // --- 🛠️ UTILITY COMMANDS HANDLER ---
+            if (command === 'ping') {
+                const sent = await message.channel.send("🏓 Measuring latency...");
+                const latency = sent.createdTimestamp - message.createdTimestamp;
+                const apiLatency = Math.round(client.ws.ping);
+                return sent.edit(`🏓 **Pong!**\n📡 **Latency Bot:** \`${latency}ms\`\n⚡ **API Latency:** \`${apiLatency}ms\``);
+            }
+
+            if (command === 'clear') {
+                if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+                    return message.channel.send("❌ Kamu tidak memiliki izin `Manage Messages`!");
+                }
+                const amount = parseInt(args[0]);
+                if (isNaN(amount) || amount < 1 || amount > 100) {
+                    return message.channel.send("❌ Masukkan jumlah pesan dari 1 sampai 100! Contoh: `!clear 10`");
+                }
+                await message.channel.bulkDelete(amount, true).catch(() => {});
+                const msg = await message.channel.send(`🧹 Berhasil menghapus **${amount}** pesan.`);
+                setTimeout(() => msg.delete().catch(() => {}), 3000);
+                return;
+            }
+
+            if (command === 'user') {
+                const targetUser = message.mentions.users.first() || message.author;
+                const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setAuthor({ name: `User Info - ${targetUser.username}`, iconURL: targetUser.displayAvatarURL() })
+                    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 512 }))
+                    .addFields(
+                        { name: '👤 Username', value: `${targetUser.tag}`, inline: true },
+                        { name: '🆔 User ID', value: `\`${targetUser.id}\``, inline: true },
+                        { name: '📅 Akun Dibuat', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: false }
+                    );
+
+                if (member) {
+                    embed.addFields({ name: '📥 Masuk Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true });
+                }
+
+                return message.channel.send({ embeds: [embed] });
+            }
+
+            if (command === 'uptime') {
+                let totalSeconds = (client.uptime / 1000);
+                let days = Math.floor(totalSeconds / 86400);
+                totalSeconds %= 86400;
+                let hours = Math.floor(totalSeconds / 3600);
+                totalSeconds %= 3600;
+                let minutes = Math.floor(totalSeconds / 60);
+                let seconds = Math.floor(totalSeconds % 60);
+
+                return message.channel.send(`⏰ **Bot Uptime:** \`${days}d ${hours}h ${minutes}m ${seconds}s\``);
+            }
+
+            if (command === 'server') {
+                const guild = message.guild;
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`Server Info - ${guild.name}`)
+                    .setThumbnail(guild.iconURL({ dynamic: true }))
+                    .addFields(
+                        { name: '👑 Owner', value: `<@${guild.ownerId}>`, inline: true },
+                        { name: '👥 Member Count', value: `\`${guild.memberCount}\` members`, inline: true },
+                        { name: '📅 Server Dibuat', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
+                    );
+                return message.channel.send({ embeds: [embed] });
+            }
+
+            if (command === 'avatar' || command === 'av') {
+                const targetUser = message.mentions.users.first() || message.author;
+                const avatarURL = targetUser.displayAvatarURL({ dynamic: true, size: 1024 });
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`Avatar - ${targetUser.username}`)
+                    .setImage(avatarURL);
+                return message.channel.send({ embeds: [embed] });
             }
         }
 
@@ -340,6 +439,22 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.customId === 'help_reminders') {
             return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
         }
+        
+        if (interaction.customId === 'help_utility') {
+            const embed = new EmbedBuilder()
+                .setColor(getRandomColor())
+                .setTitle('🛠️ Commands Utilitas')
+                .setDescription(
+                    `\`${serverCfg.botPrefix} ping\` : Cek delay respon bot\n` +
+                    `\`${serverCfg.botPrefix} clear <jumlah>\` : Hapus chat spam secara cepat\n` +
+                    `\`${serverCfg.botPrefix} user [@user]\` : Tampilkan detail info user\n` +
+                    `\`${serverCfg.botPrefix} uptime\` : Cek durasi bot menyala\n` +
+                    `\`${serverCfg.botPrefix} server\` : Informasi server Discord\n` +
+                    `\`${serverCfg.botPrefix} avatar [@user]\` : Ambil foto profil HD`
+                );
+            return interaction.update({ embeds: [embed], components: [createHelpButtons()] });
+        }
+
         if (interaction.customId === 'help_settings') {
             return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
         }
@@ -365,3 +480,6 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(process.env.TOKEN);
+
+}
+    
