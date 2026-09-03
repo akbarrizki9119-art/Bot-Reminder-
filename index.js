@@ -13,17 +13,18 @@ const client = new Client({
 const gradientColors = ['#9B59B6', '#8A2BE2', '#C71585', '#4B0082', '#7B68EE', '#DDA0DD'];
 const getRandomColor = () => gradientColors[Math.floor(Math.random() * gradientColors.length)];
 
-// 📦 Settings & Economy Maps
+// 📦 Settings Maps & RPG Data
 const serverSettings = new Map();
 const userSettings = new Map();
-const userEconomy = new Map();
 const activeTimers = new Map();
+const rpgPlayers = new Map(); // 🗡️ Data Player RPG Solo
 
 function getServerConfig(guildId) {
     if (!serverSettings.has(guildId)) {
         serverSettings.set(guildId, {
             botPrefix: "!",
             owoPrefix: "w",
+            useDefaultPrefix: true,
             owoMsg: "owo 🥳",
             huntMsg: "hunt 🎉",
             godMsg: "god hunt ⚡",
@@ -61,39 +62,49 @@ function getUserConfig(userId) {
     return userSettings.get(userId);
 }
 
-function getUserBalance(userId) {
-    if (!userEconomy.has(userId)) {
-        userEconomy.set(userId, 10000000); // Saldo awal 10 Juta
+function getRpgPlayer(userId) {
+    if (!rpgPlayers.has(userId)) {
+        rpgPlayers.set(userId, {
+            hp: 100,
+            maxHp: 100,
+            atk: 15,
+            def: 5,
+            floor: 1,
+            inventory: [],
+            equipped: { weapon: null, armor: null, helmet: null }
+        });
     }
-    return userEconomy.get(userId);
-}
-
-function setUserBalance(userId, amount) {
-    userEconomy.set(userId, Math.max(0, amount));
+    return rpgPlayers.get(userId);
 }
 
 client.on('ready', () => {
-    console.log(`✅ Bot ${client.user.tag} aktif & siap dengan Animasi OwO!`);
+    console.log(`✅ Bot ${client.user.tag} aktif & siap!`);
 });
 
 // --- 🎨 EMBED HELP & SETTINGS ---
 function createHelpEmbed(guildName, avatarURL, prefix) {
     return new EmbedBuilder()
         .setColor(getRandomColor())
-        .setAuthor({ name: '🏓 Reminders, Utility & Mini-Games Menu', iconURL: client.user.displayAvatarURL() })
+        .setAuthor({ name: '🏓 Reminders & Utility Menu', iconURL: client.user.displayAvatarURL() })
         .setDescription(
             `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
-            `💰 **EKONOMI & SALDO**\n` +
-            `\`${prefix} bal\` : Cek saldo koin kamu\n\n` +
             `**🎮 GAME REMINDERS**\n` +
-            `\`${prefix} owo\` | \`${prefix} owoh\` | \`${prefix} godh\` | \`${prefix} owopray\` | \`${prefix} owovote\`\n\n` +
-            `**🎲 MINI-GAMES (OwO Style + Live Animation)**\n` +
-            `\`${prefix} slot [taruhan/all]\` : Mesin slot muter 🍒\n` +
-            `\`${prefix} cf [head/tail/all] [taruhan]\` : Lempar koin muter 🪙\n` +
-            `\`${prefix} bj [taruhan/all]\` : Blackjack interaktif 🃏\n` +
-            `\`${prefix} fish\` : Mancing ikan 🎣\n\n` +
-            `**🛠️ UTILITY**\n` +
-            `\`${prefix} ping\` | \`${prefix} clear\` | \`${prefix} user\` | \`${prefix} uptime\` | \`${prefix} server\` | \`${prefix} avatar\``
+            `\`${prefix} owo\` : Manage **owo/uwu** 🌿\n` +
+            `\`${prefix} owoh\` : Manage **hunt (wh)** 🏹\n` +
+            `\`${prefix} godh\` : Manage **god hunt (gh)** ⚡\n` +
+            `\`${prefix} owopray\` : Manage **pray/curse** 🙏\n` +
+            `\`${prefix} owovote\` : Manage **vote (12 jam)** 🗳️\n\n` +
+            `**⚔️ DUNGEON RPG (SOLO)**\n` +
+            `\`${prefix} dungeon\` : Masuk ke ruang bawah tanah & lawan monster\n` +
+            `\`${prefix} inv\` : Cek status, inventory, & gear\n` +
+            `\`${prefix} equip <no>\` : Pakai item dari inventory\n\n` +
+            `**🛠️ UTILITY COMMANDS**\n` +
+            `\`${prefix} ping\` : Cek latency bot\n` +
+            `\`${prefix} clear <1-100>\` : Clear chat spam\n` +
+            `\`${prefix} user [@user]\` : Cek info akun\n` +
+            `\`${prefix} uptime\` : Cek berapa lama bot nyala\n` +
+            `\`${prefix} server\` : Cek info server\n` +
+            `\`${prefix} avatar [@user]\` : Ambil foto profil HD`
         )
         .setFooter({ text: `Server ${guildName || 'OPPAI'}`, iconURL: avatarURL || client.user.displayAvatarURL() });
 }
@@ -101,7 +112,7 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
 function createHelpButtons() {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('help_reminders').setLabel('Reminders').setEmoji('🏓').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('help_utility').setLabel('Utilitas & Games').setEmoji('🎲').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('help_utility').setLabel('Utilitas').setEmoji('🛠️').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('help_settings').setLabel('Settings').setEmoji('⚙️').setStyle(ButtonStyle.Secondary)
     );
 }
@@ -112,11 +123,12 @@ function createServerSettingsEmbed(guildId) {
         .setColor(getRandomColor())
         .setTitle('Server Settings')
         .setDescription(
-            `⚙️ **Bot prefix:** \`${config.botPrefix}\` (\`${config.botPrefix} s prefix <baru>\`)\n` +
+            `⚙️ **OwO prefix:** \`${config.owoPrefix}\`\n` +
+            `🤖 **Bot prefix:** \`${config.botPrefix}\` (\`${config.botPrefix} s prefix <baru>\`)\n\n` +
             `🌱 **owo:** \`${config.botPrefix} s owo <pesan>\`\n` +
             `🏹 **hunt:** \`${config.botPrefix} s hunt <pesan>\`\n` +
             `⚡ **god hunt:** \`${config.botPrefix} s godh <pesan>\`\n` +
-            `☘️ **pray:** \`${config.botPrefix} s pray <pesan>\`\n` +
+            `☘️ **pray/curse:** \`${config.botPrefix} s pray <pesan>\`\n` +
             `🗳️ **vote:** \`${config.botPrefix} s vote <pesan>\``
         );
 }
@@ -126,13 +138,16 @@ function createSettingsEmbed(user, type) {
     const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
     const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
     const isEnabled = config[keyMap[type]];
+    const currentMode = config[modeMap[type]];
 
     return new EmbedBuilder()
         .setColor(isEnabled ? getRandomColor() : '#F04747')
         .setAuthor({ name: `${user.username}'s ${type} settings`, iconURL: user.displayAvatarURL() })
         .setDescription(
-            `${isEnabled ? '✅' : '❌'} **Enabled?** | ${config.pingsEnabled ? '✅' : '❌'} **Ping?** | ${config.replyEnabled ? '✅' : '❌'} **Reply?**\n` +
-            `💬 **Mode:** \`${config[modeMap[type]]?.toUpperCase() || 'TEXT'}\``
+            `${isEnabled ? '✅' : '❌'} **Reminder Enabled?**\n` +
+            `${config.pingsEnabled ? '✅' : '❌'} **Pings Enabled?**\n` +
+            `${config.replyEnabled ? '✅' : '❌'} **Inline Reply?**\n` +
+            `💬 **Mode:** \`${currentMode?.toUpperCase() || 'TEXT'}\``
         );
 }
 
@@ -166,6 +181,7 @@ client.on('messageCreate', async (message) => {
         const serverCfg = getServerConfig(guildId);
         const userCfg = getUserConfig(userId);
 
+        // --- 🤖 DETEKSI PESAN DARI BOT (OwO Bot / God Bot) ---
         if (message.author.bot) {
             if (msgLower.includes("captcha") || msgLower.includes("verify")) {
                 message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`).catch(() => {});
@@ -178,11 +194,25 @@ client.on('messageCreate', async (message) => {
 
                 let totalMs = 0;
                 let durationParts = [];
-                if (hoursMatch) { const h = parseInt(hoursMatch[1]); totalMs += h * 3600000; durationParts.push(`${h} Jam`); }
-                if (minutesMatch) { const m = parseInt(minutesMatch[1]); totalMs += m * 60000; durationParts.push(`${m} Menit`); }
-                if (secondsMatch) { const s = parseInt(secondsMatch[1]); totalMs += s * 1000; durationParts.push(`${s} Detik`); }
+
+                if (hoursMatch) {
+                    const h = parseInt(hoursMatch[1]);
+                    totalMs += h * 3600000;
+                    durationParts.push(`${h} Jam`);
+                }
+                if (minutesMatch) {
+                    const m = parseInt(minutesMatch[1]);
+                    totalMs += m * 60000;
+                    durationParts.push(`${m} Menit`);
+                }
+                if (secondsMatch) {
+                    const s = parseInt(secondsMatch[1]);
+                    totalMs += s * 1000;
+                    durationParts.push(`${s} Detik`);
+                }
 
                 const durationString = durationParts.join(' ') || 'beberapa saat';
+
                 let targetUser = message.mentions.users.first();
                 let huntTypeLabel = "OWO HUNTBOT";
 
@@ -194,8 +224,24 @@ client.on('messageCreate', async (message) => {
                     }
                 }
 
+                if (!targetUser) {
+                    const recentMsgs = await message.channel.messages.fetch({ limit: 6 }).catch(() => null);
+                    if (recentMsgs) {
+                        const huntKeywords = ['hb', 'ghb', 'whb', 'ah', 'w ah', 'autohunt', 'gah'];
+                        const lastUserMsg = recentMsgs.find(m => !m.author.bot && huntKeywords.some(kw => m.content.toLowerCase().includes(kw)));
+                        
+                        if (lastUserMsg) {
+                            targetUser = lastUserMsg.author;
+                            if (lastUserMsg.content.toLowerCase().includes('ghb') || lastUserMsg.content.toLowerCase().includes('gah')) {
+                                huntTypeLabel = "GOD HUNTBOT";
+                            }
+                        }
+                    }
+                }
+
                 if (totalMs > 0 && targetUser) {
                     message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\``).catch(() => {});
+                    
                     setTimeout(async () => {
                         try {
                             await targetUser.send({
@@ -203,7 +249,7 @@ client.on('messageCreate', async (message) => {
                                 allowedMentions: { users: [targetUser.id] }
                             });
                         } catch (e) {
-                            message.channel.send(`🚨 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** (DM tertutup)`).catch(() => {});
+                            message.channel.send(`🚨 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** (DM kamu tertutup)`).catch(() => {});
                         }
                     }, totalMs);
                 }
@@ -211,6 +257,7 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
+        // --- 🛠️ COMMAND HANDLER ---
         let usedPrefix = null;
         if (msgLower.startsWith('!pai')) {
             usedPrefix = '!pai';
@@ -227,19 +274,22 @@ client.on('messageCreate', async (message) => {
             }
             if (command === 'settings') return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
-            if (command === 'bal' || command === 'balance') {
-                const currentBal = getUserBalance(userId);
-                return message.channel.send(`🪙 **|** <@${userId}>, you have **${currentBal.toLocaleString()}** cowoncy! :herb:`);
-            }
-
+            // --- ⚙️ SERVER SETTINGS ---
             if (command === 's' || command === 'set') {
                 const subCmd = args.shift()?.toLowerCase();
                 const newMsg = args.join(" ");
+
                 if (subCmd === 'prefix') {
-                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru!`);
+                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} s prefix .\``);
                     serverCfg.botPrefix = args[0];
-                    return message.channel.send(`✅ Bot prefix diubah ke \`${serverCfg.botPrefix}\``);
+                    return message.channel.send(`✅ Bot prefix berhasil diubah menjadi \`${serverCfg.botPrefix}\``);
                 }
+                if (subCmd === 'owoprefix') {
+                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} s owoprefix w\``);
+                    serverCfg.owoPrefix = args[0];
+                    return message.channel.send(`✅ OwO prefix berhasil diubah menjadi \`${serverCfg.owoPrefix}\``);
+                }
+
                 if (subCmd === 'hunt') { serverCfg.huntMsg = newMsg; return message.channel.send(`✅ Updated **hunt** msg.`); }
                 if (subCmd === 'godh' || subCmd === 'god') { serverCfg.godMsg = newMsg; return message.channel.send(`✅ Updated **god hunt** msg.`); }
                 if (subCmd === 'owo') { serverCfg.owoMsg = newMsg; return message.channel.send(`✅ Updated **owo** msg.`); }
@@ -251,203 +301,222 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send({ embeds: [createSettingsEmbed(message.author, command)], components: createSettingsButtons(message.author, command) });
             }
 
-            // --- 🎰 SLOT DENGAN LIVE EDIT ANIMASI MUTER (Persis OwO Bot) ---
-            if (command === 'slot' || command === 'slt') {
-                const betInput = args[0]?.toLowerCase();
-                let betAmount = 100;
-                const currentBal = getUserBalance(userId);
+            if (command === 'gif') {
+                const kategori = args[0]?.toLowerCase();
+                const linkGif = args[1];
+                if (!kategori || !linkGif) return message.channel.send(`❌ Format: \`${usedPrefix} gif godh <link_gif>\``);
+                if (kategori === 'owo') userCfg.owoGif = linkGif;
+                else if (kategori === 'hunt' || kategori === 'owoh') userCfg.huntGif = linkGif;
+                else if (kategori === 'godh' || kategori === 'god' || kategori === 'gh') userCfg.godGif = linkGif;
+                else if (kategori === 'pray' || kategori === 'owopray') userCfg.prayGif = linkGif;
+                else if (kategori === 'vote' || kategori === 'owovote') userCfg.voteGif = linkGif;
+                return message.channel.send(`✅ GIF **${kategori}** diperbarui!`);
+            }
 
-                if (betInput === 'all') betAmount = currentBal;
-                else if (betInput && !isNaN(parseInt(betInput))) betAmount = parseInt(betInput);
+            // --- ⚔️ DUNGEON & LOOT RPG COMMANDS (SOLO) ---
+            if (command === 'dungeon' || command === 'dg') {
+                const player = getRpgPlayer(userId);
+                
+                const enemyHp = 50 + (player.floor * 15);
+                const enemyAtk = 8 + (player.floor * 4);
+                
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`🗺️ Dungeon Raid - Floor ${player.floor}`)
+                    .setDescription(`⚠️ **Musuh Muncul!**\n❤️ Monster HP: \`${enemyHp}\`\n⚔️ Monster ATK: \`${enemyAtk}\`\n\n*Pertarungan sedang berlangsung...*`);
+                
+                const sentMsg = await message.channel.send({ embeds: [embed] });
 
-                if (betAmount <= 0) return message.channel.send(`❌ Taruhan tidak valid!`);
-                if (currentBal < betAmount) return message.channel.send(`🪙 **|** <@${userId}>, saldo kurang! (Punya: **${currentBal.toLocaleString()}** 🪙)`);
-
-                const fruits = [' :cherries: ', ' :lemon: ', ' :watermelon: ', ' :grapes: ', ' :gem: ', ' :star: ', ' :seven: '];
-                const getRandomFruit = () => fruits[Math.floor(Math.random() * fruits.length)];
-
-                // Kirim pesan awal slot
-                const msg = await message.channel.send(`🎲 **__SLOTS__**\n| :hourglass: | :hourglass: | :hourglass: |\n<@${userId}> bet **${betAmount.toLocaleString()}** 🪙`);
-
-                // Animasi putaran 1 (Edit setelah 500ms)
                 setTimeout(async () => {
-                    await msg.edit(`🎲 **__SLOTS__**\n|${getRandomFruit()}|${getRandomFruit()}|${getRandomFruit()}|\n<@${userId}> bet **${betAmount.toLocaleString()}** 🪙`).catch(() => {});
-                }, 500);
+                    let totalAtk = player.atk + (player.equipped.weapon?.stat || 0);
+                    let totalDef = player.def + (player.equipped.armor?.stat || 0) + (player.equipped.helmet?.stat || 0);
 
-                // Animasi putaran 2 (Edit setelah 1000ms)
-                setTimeout(async () => {
-                    await msg.edit(`🎲 **__SLOTS__**\n|${getRandomFruit()}|${getRandomFruit()}|${getRandomFruit()}|\n<@${userId}> bet **${betAmount.toLocaleString()}** 🪙`).catch(() => {});
-                }, 1000);
+                    const playerPower = totalAtk * 3 + totalDef;
+                    const enemyPower = enemyHp + (enemyAtk * 2);
 
-                // Hasil Akhir (Edit setelah 1500ms)
-                setTimeout(async () => {
-                    const finalFruits = [getRandomFruit(), getRandomFruit(), getRandomFruit()];
-                    let reward = 0;
-                    let resultText = "";
+                    if (playerPower >= enemyPower || Math.random() > 0.2) {
+                        // Drop Rate: 55% Common, 25% Uncommon, 12% Rare, 6% Epic, 2% Legendary
+                        const roll = Math.random() * 100;
+                        let rarity = 'Common';
+                        let rarityEmoji = '⚪';
+                        let color = '#95a5a6';
 
-                    if (finalFruits[0] === finalFruits[1] && finalFruits[1] === finalFruits[2]) {
-                        reward = betAmount * 5;
-                        setUserBalance(userId, currentBal - betAmount + reward);
-                        resultText = `and won **${reward.toLocaleString()}** cowoncy! **JACKPOT!** 🎉`;
-                    } else if (finalFruits[0] === finalFruits[1] || finalFruits[1] === finalFruits[2] || finalFruits[0] === finalFruits[2]) {
-                        reward = Math.floor(betAmount * 1.5);
-                        setUserBalance(userId, currentBal - betAmount + reward);
-                        resultText = `and won **${reward.toLocaleString()}** cowoncy! ✨`;
+                        if (roll <= 2) { 
+                            rarity = 'Legendary'; rarityEmoji = '🟡'; color = '#f1c40f'; 
+                        } else if (roll <= 8) { 
+                            rarity = 'Epic'; rarityEmoji = '🟣'; color = '#9b59b6'; 
+                        } else if (roll <= 20) { 
+                            rarity = 'Rare'; rarityEmoji = '🔵'; color = '#3498db'; 
+                        } else if (roll <= 45) { 
+                            rarity = 'Uncommon'; rarityEmoji = '🟢'; color = '#2ecc71'; 
+                        }
+
+                        const itemTypes = [
+                            { type: 'Weapon', name: 'Sword', emoji: '🗡️', baseStat: player.floor * 3 },
+                            { type: 'Armor', name: 'Chestplate', emoji: '🛡️', baseStat: player.floor * 2 },
+                            { type: 'Helmet', name: 'Helm', emoji: '⛑️', baseStat: player.floor * 2 }
+                        ];
+                        const selectedItemType = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+                        
+                        let multiplier = 1;
+                        if (rarity === 'Uncommon') multiplier = 1.5;
+                        if (rarity === 'Rare') multiplier = 2.5;
+                        if (rarity === 'Epic') multiplier = 4.0;
+                        if (rarity === 'Legendary') multiplier = 7.5;
+
+                        const itemStat = Math.floor(selectedItemType.baseStat * multiplier);
+                        const newItem = {
+                            id: Date.now(),
+                            name: `${rarity} ${selectedItemType.name}`,
+                            type: selectedItemType.type,
+                            emoji: selectedItemType.emoji,
+                            rarity: rarity,
+                            stat: itemStat
+                        };
+
+                        player.inventory.push(newItem);
+                        player.floor += 1;
+
+                        const winEmbed = new EmbedBuilder()
+                            .setColor(color)
+                            .setTitle(`🎉 Victory! (Floor ${player.floor - 1} Clear)`)
+                            .setDescription(
+                                `Musuh berhasil dikalahkan! ⚔️\n\n` +
+                                `🎁 **Item Drop Didapat:**\n` +
+                                `${rarityEmoji} **[${rarity}] ${selectedItemType.emoji} ${selectedItemType.name}** (+${itemStat} ${selectedItemType.type === 'Weapon' ? 'ATK' : 'DEF'})\n\n` +
+                                `✨ Naik ke **Floor ${player.floor}**! Ketik \`${usedPrefix} dungeon\` lagi untuk lanjut.`
+                            );
+                        await sentMsg.edit({ embeds: [winEmbed] });
+
                     } else {
-                        setUserBalance(userId, currentBal - betAmount);
-                        resultText = `and won nothing... :c`;
+                        const loseEmbed = new EmbedBuilder()
+                            .setColor('#e74c3c')
+                            .setTitle(`💀 Defeat!`)
+                            .setDescription(`Kamu terlalu lemah untuk mengalahkan monster di Floor ${player.floor}! Silakan perkuat gear-mu.`);
+                        await sentMsg.edit({ embeds: [loseEmbed] });
                     }
-
-                    const finalBal = getUserBalance(userId);
-                    await msg.edit(`🎲 **__SLOTS__**\n|${finalFruits.join('|')}|\n<@${userId}> bet **${betAmount.toLocaleString()}** 🪙\n${resultText}\n🪙 Balance: **${finalBal.toLocaleString()}**`).catch(() => {});
-                }, 1500);
-                return;
-            }
-
-            // --- 🪙 COINFLIP DENGAN LIVE EDIT ANIMASI TOSSING ---
-            if (command === 'cf' || command === 'coinflip') {
-                let choice = args[0]?.toLowerCase();
-                let betInput = args[1]?.toLowerCase();
-                let userChoice = 'h';
-                let betAmount = 100;
-                const currentBal = getUserBalance(userId);
-
-                if (['head', 'heads', 'h'].includes(choice)) userChoice = 'h';
-                else if (['tail', 'tails', 't'].includes(choice)) userChoice = 't';
-                else if (choice === 'all') betAmount = currentBal;
-                else if (!isNaN(parseInt(choice))) betAmount = parseInt(choice);
-
-                if (betInput === 'all') betAmount = currentBal;
-                else if (betInput && !isNaN(parseInt(betInput))) betAmount = parseInt(betInput);
-
-                if (betAmount <= 0) return message.channel.send(`❌ Taruhan tidak valid!`);
-                if (currentBal < betAmount) return message.channel.send(`🪙 **|** <@${userId}>, saldo kurang!`);
-
-                const choiceName = userChoice === 'h' ? 'heads' : 'tails';
-                const msg = await message.channel.send(`<@${userId}> spent **${betAmount.toLocaleString()}** 🪙 and chose **${choiceName}**\nThe coin spins... 🔄`);
-
-                setTimeout(async () => {
-                    await msg.edit(`<@${userId}> spent **${betAmount.toLocaleString()}** 🪙 and chose **${choiceName}**\nThe coin spins... 🪙✨`).catch(() => {});
-                }, 800);
-
-                setTimeout(async () => {
-                    const flipResult = Math.random() < 0.5 ? 'h' : 't';
-                    const resultWord = flipResult === 'h' ? 'heads' : 'tails';
-                    const isWin = userChoice === flipResult;
-                    let finalBal;
-
-                    if (isWin) {
-                        setUserBalance(userId, currentBal + betAmount);
-                        finalBal = getUserBalance(userId);
-                        await msg.edit(`<@${userId}> spent **${betAmount.toLocaleString()}** 🪙 and chose **${choiceName}**\nThe coin spins... 🪙 and you won **${betAmount.toLocaleString()}**!! 🎉\n🪙 Balance: **${finalBal.toLocaleString()}**`).catch(() => {});
-                    } else {
-                        setUserBalance(userId, currentBal - betAmount);
-                        finalBal = getUserBalance(userId);
-                        await msg.edit(`<@${userId}> spent **${betAmount.toLocaleString()}** 🪙 and chose **${choiceName}**\nThe coin spins... 🦅 and you lost... 😢\n🪙 Balance: **${finalBal.toLocaleString()}**`).catch(() => {});
-                    }
-                }, 1500);
-                return;
-            }
-
-            // --- 🃏 BLACKJACK INTERAKTIF (OwO Style) ---
-            if (command === 'bj' || command === 'blackjack') {
-                const betInput = args[0]?.toLowerCase();
-                let betAmount = 100;
-                const currentBal = getUserBalance(userId);
-
-                if (betInput === 'all') betAmount = currentBal;
-                else if (betInput && !isNaN(parseInt(betInput))) betAmount = parseInt(betInput);
-
-                if (betAmount <= 0) return message.channel.send(`❌ Taruhan tidak valid!`);
-                if (currentBal < betAmount) return message.channel.send(`🪙 **|** Saldo tidak cukup!`);
-
-                const drawCard = () => Math.floor(Math.random() * 10) + 1;
-                let pCards = [drawCard(), drawCard()];
-                let dCards = [drawCard(), drawCard()];
-                let pTotal = pCards.reduce((a, b) => a + b, 0);
-
-                const getBjButtons = (disabled = false) => {
-                    return new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId(`bj_hit_${userId}_${betAmount}`).setLabel('Hit').setEmoji('➕').setStyle(ButtonStyle.Primary).setDisabled(disabled),
-                        new ButtonBuilder().setCustomId(`bj_stand_${userId}_${betAmount}`).setLabel('Stand').setEmoji('🛑').setStyle(ButtonStyle.Danger).setDisabled(disabled)
-                    );
-                };
-
-                const contentText = `<@${userId}>, you bet **${betAmount.toLocaleString()}** to play blackjack\n` +
-                                    `Dealer [ 1+ ]\n` +
-                                    `> 🃏 [ ${dCards[0]} ] [ ❓ ]\n` +
-                                    `<@${userId}> [ ${pTotal} ]\n` +
-                                    `> 🃏 [ ${pCards.join(' ] [ ')} ]`;
-
-                await message.channel.send({ content: contentText, components: [getBjButtons(false)] });
-                return;
-            }
-
-            // --- 🎣 MANCING (FISH) DENGAN LIVE ANIMASI ---
-            if (command === 'fish' || command === 'mancing') {
-                const msg = await message.channel.send(`<@${userId}> casts their fishing rod... 🎣 🌊`);
-
-                setTimeout(async () => {
-                    await msg.edit(`<@${userId}> casts their fishing rod... 🎣 🌊 *waiting for a bite...*`).catch(() => {});
-                }, 1000);
-
-                setTimeout(async () => {
-                    const fishes = [
-                        { name: '🐟 Common Fish', reward: 50 },
-                        { name: '🐠 Tropical Fish', reward: 100 },
-                        { name: '🦈 Megalodon', reward: 1000 },
-                        { name: '🦑 Giant Squid', reward: 500 },
-                        { name: '💎 Rare Diamond', reward: 5000 }
-                    ];
-                    const caught = fishes[Math.floor(Math.random() * fishes.length)];
-                    const currentBal = getUserBalance(userId);
-                    setUserBalance(userId, currentBal + caught.reward);
-                    const finalBal = getUserBalance(userId);
-
-                    await msg.edit(`<@${userId}> caught a **${caught.name}** and got **${caught.reward.toLocaleString()}** cowoncy! 🎣🎉\n🪙 Balance: **${finalBal.toLocaleString()}**`).catch(() => {});
                 }, 2000);
                 return;
             }
 
-            // --- UTILITY COMMANDS ---
+            if (command === 'inv' || command === 'inventory') {
+                const player = getRpgPlayer(userId);
+                let invList = player.inventory.length === 0 ? 'Inventory kosong! Yuk main dungeon dulu (`!dungeon`).' : player.inventory.map((item, idx) => `\`[${idx + 1}]\` ${item.emoji} **${item.name}** (+${item.stat})`).join('\n');
+                
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`🎒 ${message.author.username}'s Inventory & Stats`)
+                    .setDescription(
+                        `❤️ HP: \`${player.hp}/${player.maxHp}\`\n` +
+                        `⚔️ Base ATK: \`${player.atk}\` | 🛡️ Base DEF: \`${player.def}\`\n` +
+                        `🗺️ Current Floor: \`Floor ${player.floor}\`\n\n` +
+                        `🛡️ **Equipped Gear:**\n` +
+                        `• Weapon: ${player.equipped.weapon ? `${player.equipped.weapon.emoji} ${player.equipped.weapon.name} (+${player.equipped.weapon.stat})` : 'None'}\n` +
+                        `• Armor: ${player.equipped.armor ? `${player.equipped.armor.emoji} ${player.equipped.armor.name} (+${player.equipped.armor.stat})` : 'None'}\n` +
+                        `• Helmet: ${player.equipped.helmet ? `${player.equipped.helmet.emoji} ${player.equipped.helmet.name} (+${player.equipped.helmet.stat})` : 'None'}\n\n` +
+                        `📦 **Items List:**\n${invList}\n\n` +
+                        `*Gunakan \`${usedPrefix} equip <nomor>\` untuk memakai item.*`
+                    );
+                return message.channel.send({ embeds: [embed] });
+            }
+
+            if (command === 'equip') {
+                const player = getRpgPlayer(userId);
+                const index = parseInt(args[0]) - 1;
+
+                if (isNaN(index) || !player.inventory[index]) {
+                    return message.channel.send(`❌ Masukkan nomor item yang valid dari inventory! Contoh: \`${usedPrefix} equip 1\``);
+                }
+
+                const item = player.inventory[index];
+                if (item.type === 'Weapon') player.equipped.weapon = item;
+                else if (item.type === 'Armor') player.equipped.armor = item;
+                else if (item.type === 'Helmet') player.equipped.helmet = item;
+
+                return message.channel.send(`✅ Berhasil memakai **${item.name}** (${item.emoji})! Status tempur meningkat.`);
+            }
+
+            // --- 🛠️ UTILITY COMMANDS HANDLER ---
             if (command === 'ping') {
-                const sent = await message.channel.send("🏓 Measuring...");
+                const sent = await message.channel.send("🏓 Measuring latency...");
                 const latency = sent.createdTimestamp - message.createdTimestamp;
-                return sent.edit(`🏓 **Pong!** \`${latency}ms\``);
+                const apiLatency = Math.round(client.ws.ping);
+                return sent.edit(`🏓 **Pong!**\n📡 **Latency Bot:** \`${latency}ms\`\n⚡ **API Latency:** \`${apiLatency}ms\``);
             }
 
             if (command === 'clear') {
-                if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.channel.send("❌ No permission!");
-                const amount = parseInt(args[0]) || 5;
+                if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+                    return message.channel.send("❌ Kamu tidak memiliki izin `Manage Messages`!");
+                }
+                const amount = parseInt(args[0]);
+                if (isNaN(amount) || amount < 1 || amount > 100) {
+                    return message.channel.send("❌ Masukkan jumlah pesan dari 1 sampai 100! Contoh: `!clear 10`");
+                }
                 await message.channel.bulkDelete(amount, true).catch(() => {});
-                const m = await message.channel.send(`🧹 Cleared **${amount}** messages.`);
-                setTimeout(() => m.delete().catch(() => {}), 3000);
+                const msg = await message.channel.send(`🧹 Berhasil menghapus **${amount}** pesan.`);
+                setTimeout(() => msg.delete().catch(() => {}), 3000);
                 return;
             }
 
             if (command === 'user') {
-                const target = message.mentions.users.first() || message.author;
-                return message.channel.send(`👤 **User:** ${target.tag} (\`${target.id}\`)`);
+                const targetUser = message.mentions.users.first() || message.author;
+                const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setAuthor({ name: `User Info - ${targetUser.username}`, iconURL: targetUser.displayAvatarURL() })
+                    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 512 }))
+                    .addFields(
+                        { name: '👤 Username', value: `${targetUser.tag}`, inline: true },
+                        { name: '🆔 User ID', value: `\`${targetUser.id}\``, inline: true },
+                        { name: '📅 Akun Dibuat', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: false }
+                    );
+
+                if (member) {
+                    embed.addFields({ name: '📥 Masuk Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true });
+                }
+
+                return message.channel.send({ embeds: [embed] });
             }
 
             if (command === 'uptime') {
-                let s = Math.floor(client.uptime / 1000);
-                let m = Math.floor(s / 60); s %= 60;
-                let h = Math.floor(m / 60); m %= 60;
-                return message.channel.send(`⏰ **Uptime:** \`${h}h ${m}m ${s}s\``);
+                let totalSeconds = (client.uptime / 1000);
+                let days = Math.floor(totalSeconds / 86400);
+                totalSeconds %= 86400;
+                let hours = Math.floor(totalSeconds / 3600);
+                totalSeconds %= 3600;
+                let minutes = Math.floor(totalSeconds / 60);
+                let seconds = Math.floor(totalSeconds % 60);
+
+                return message.channel.send(`⏰ **Bot Uptime:** \`${days}d ${hours}h ${minutes}m ${seconds}s\``);
             }
 
             if (command === 'server') {
-                return message.channel.send(`🏰 **Server:** ${message.guild.name} (\`${message.guild.memberCount} members\`)`);
+                const guild = message.guild;
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`Server Info - ${guild.name}`)
+                    .setThumbnail(guild.iconURL({ dynamic: true }))
+                    .addFields(
+                        { name: '👑 Owner', value: `<@${guild.ownerId}>`, inline: true },
+                        { name: '👥 Member Count', value: `\`${guild.memberCount}\` members`, inline: true },
+                        { name: '📅 Server Dibuat', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
+                    );
+                return message.channel.send({ embeds: [embed] });
             }
 
             if (command === 'avatar' || command === 'av') {
-                const target = message.mentions.users.first() || message.author;
-                return message.channel.send(target.displayAvatarURL({ size: 1024 }));
+                const targetUser = message.mentions.users.first() || message.author;
+                const avatarURL = targetUser.displayAvatarURL({ dynamic: true, size: 1024 });
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`Avatar - ${targetUser.username}`)
+                    .setImage(avatarURL);
+                return message.channel.send({ embeds: [embed] });
             }
         }
 
-        // --- AUTOMATIC REMINDERS ---
+        // --- 🎯 AUTOMATIC REMINDERS ---
         const handleTimer = (type, timeMs, textMsg, modeKey, gifUrl) => {
             const timerKey = `${userId}_${type}_${message.channel.id}`;
             if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
@@ -455,10 +524,17 @@ client.on('messageCreate', async (message) => {
             const timer = setTimeout(() => {
                 const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
                 const payload = { content: `${mentionStr} ${textMsg}` };
+                
                 if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
+                
                 if (userCfg[modeKey] === 'gif') {
-                    payload.embeds = [new EmbedBuilder().setColor(getRandomColor()).setImage(gifUrl)];
+                    payload.embeds = [
+                        new EmbedBuilder()
+                            .setColor(getRandomColor())
+                            .setImage(gifUrl)
+                    ];
                 }
+
                 message.channel.send(payload).catch(() => {});
                 activeTimers.delete(timerKey);
             }, timeMs);
@@ -491,99 +567,46 @@ client.on('messageCreate', async (message) => {
 
         const isVote = ['owo vote', 'w vote', 'vote'].includes(msgLower) || msgLower.startsWith('ov') || msgLower.startsWith('wv');
         if (isVote && userCfg.voteEnabled) {
-            handleTimer('vote', 12 * 3600000, serverCfg.voteMsg, 'voteMode', userCfg.voteGif);
-            message.channel.send(`✅ <@${userId}> Reminder vote 12 jam dipasang! 🗳️`).catch(() => {});
+            const voteTimeMs = 12 * 60 * 60 * 1000;
+            handleTimer('vote', voteTimeMs, serverCfg.voteMsg, 'voteMode', userCfg.voteGif);
+            message.channel.send(`✅ <@${userId}> Pengingat vote 12 jam berhasil dipasang! 🗳️`).catch(() => {});
             return;
         }
 
     } catch (err) {
-        console.error(err);
+        console.error("Message error:", err);
     }
 });
 
-// --- BUTTON INTERACTION HANDLER ---
+// --- 🔘 BUTTON INTERACTION HANDLER ---
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
+        const parts = interaction.customId.split('_');
         const guildId = interaction.guild?.id || 'dm';
         const serverCfg = getServerConfig(guildId);
 
         if (interaction.customId === 'help_reminders') {
             return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
         }
+        
         if (interaction.customId === 'help_utility') {
-            const embed = new EmbedBuilder().setColor(getRandomColor()).setTitle('🎲 Utilitas & Mini-Games').setDescription(`Gunakan command prefix bot.`);
+            const embed = new EmbedBuilder()
+                .setColor(getRandomColor())
+                .setTitle('🛠️ Commands Utilitas')
+                .setDescription(
+                    `\`${serverCfg.botPrefix} ping\` : Cek delay respon bot\n` +
+                    `\`${serverCfg.botPrefix} clear <jumlah>\` : Hapus chat spam secara cepat\n` +
+                    `\`${serverCfg.botPrefix} user [@user]\` : Tampilkan detail info user\n` +
+                    `\`${serverCfg.botPrefix} uptime\` : Cek durasi bot menyala\n` +
+                    `\`${serverCfg.botPrefix} server\` : Informasi server Discord\n` +
+                    `\`${serverCfg.botPrefix} avatar [@user]\` : Ambil foto profil HD`
+                );
             return interaction.update({ embeds: [embed], components: [createHelpButtons()] });
         }
+
         if (interaction.customId === 'help_settings') {
             return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
-        }
-
-        const parts = interaction.customId.split('_');
-
-        if (parts[0] === 'bj') {
-            const action = parts[1];
-            const ownerId = parts[2];
-            const betAmount = parseInt(parts[3]);
-
-            if (interaction.user.id !== ownerId) return interaction.reply({ content: '❌ Bukan game kamu!', ephemeral: true });
-
-            const currentBal = getUserBalance(ownerId);
-            const msgContent = interaction.message.content;
-            const pMatch = msgContent.match(/> 🃏 \[ (.*?) \]/g);
-            if (!pMatch) return interaction.update({ content: '❌ Error game.', components: [] });
-
-            let pCardsRaw = pMatch[pMatch.length - 1].replace('> 🃏 [ ', '').replace(' ]', '').split(' ] [ ');
-            let pTotal = pCardsRaw.reduce((a, b) => a + (isNaN(b) ? 10 : parseInt(b)), 0);
-            const drawCard = () => Math.floor(Math.random() * 10) + 1;
-
-            if (action === 'hit') {
-                const newCard = drawCard();
-                pCardsRaw.push(newCard);
-                pTotal = pCardsRaw.reduce((a, b) => a + parseInt(b), 0);
-
-                if (pTotal > 21) {
-                    setUserBalance(ownerId, currentBal - betAmount);
-                    const finalBal = getUserBalance(ownerId);
-                    return interaction.update({
-                        content: `<@${ownerId}>, BUST! 💥 You lost **${betAmount.toLocaleString()}** cowoncy.\n🪙 Balance: **${finalBal.toLocaleString()}**`,
-                        components: []
-                    });
-                } else {
-                    const text = `<@${ownerId}>, you bet **${betAmount.toLocaleString()}** to play blackjack\n` +
-                                 `Dealer [ 1+ ]\n> 🃏 [ ❓ ] [ ❓ ]\n` +
-                                 `<@${ownerId}> [ ${pTotal} ]\n> 🃏 [ ${pCardsRaw.join(' ] [ ')} ]`;
-                    return interaction.update({ content: text, components: [interaction.message.components[0]] });
-                }
-            }
-
-            if (action === 'stand') {
-                let dCards = [drawCard(), drawCard()];
-                let dTotal = dCards.reduce((a, b) => a + b, 0);
-                while (dTotal < 17) {
-                    dCards.push(drawCard());
-                    dTotal = dCards.reduce((a, b) => a + b, 0);
-                }
-
-                let resText = '';
-                if (dTotal > 21 || pTotal > dTotal) {
-                    setUserBalance(ownerId, currentBal + betAmount);
-                    resText = `🎉 **You won ${betAmount.toLocaleString()} cowoncy!**`;
-                } else if (pTotal < dTotal) {
-                    setUserBalance(ownerId, currentBal - betAmount);
-                    resText = `😢 **Dealer wins! Lost ${betAmount.toLocaleString()} cowoncy.**`;
-                } else {
-                    resText = `🤝 **Push (Tie)!**`;
-                }
-
-                const updatedBal = getUserBalance(ownerId);
-                const text = `<@${ownerId}> Blackjack Result:\n` +
-                             `Dealer [ ${dTotal} ] -> \`[ ${dCards.join(' ] [ ')} ]\`\n` +
-                             `You [ ${pTotal} ] -> \`[ ${pCardsRaw.join(' ] [ ')} ]\`\n\n` +
-                             `${resText}\n🪙 Balance: **${updatedBal.toLocaleString()}**`;
-
-                return interaction.update({ content: text, components: [] });
-            }
         }
 
         if (parts[0] === 'toggle') {
@@ -602,7 +625,7 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.update({ embeds: [createSettingsEmbed(interaction.user, type)], components: createSettingsButtons(interaction.user, type) });
         }
     } catch (err) {
-        console.error(err);
+        console.error("Button error:", err);
     }
 });
 
