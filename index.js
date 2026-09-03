@@ -19,6 +19,9 @@ const userSettings = new Map();
 const userEconomy = new Map(); // Untuk simpan saldo cash user
 const activeTimers = new Map();
 
+// Helper sleep untuk animasi game
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function getServerConfig(guildId) {
     if (!serverSettings.has(guildId)) {
         serverSettings.set(guildId, {
@@ -62,10 +65,10 @@ function getUserConfig(userId) {
     return userSettings.get(userId);
 }
 
-// 💰 Fungsi Ambil Saldo (Otomatis dapet 10 Juta kalau belum ada)
+// 💰 Fungsi Ambil Saldo (Otomatis dapet 15 Juta kalau belum ada)
 function getUserBalance(userId) {
     if (!userEconomy.has(userId)) {
-        userEconomy.set(userId, 10000000); // Saldo awal 10.000.000
+        userEconomy.set(userId, 15000000); 
     }
     return userEconomy.get(userId);
 }
@@ -93,11 +96,11 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
             `\`${prefix} godh\` : Manage **god hunt (gh)** ⚡\n` +
             `\`${prefix} owopray\` : Manage **pray/curse** 🙏\n` +
             `\`${prefix} owovote\` : Manage **vote (12 jam)** 🗳️\n\n` +
-            `**🎲 MINI-GAMES**\n` +
+            `**🎲 MINI-GAMES (Gaya Bot Referensi)**\n` +
             `\`${prefix} slot [taruhan/all]\` : Mesin slot beranimasi 🍒💎\n` +
-            `\`${prefix} cf [head/tail/all] [taruhan]\` : Lempar koin beranimasi 🪙\n` +
-            `\`${prefix} bj [taruhan/all]\` : Main Blackjack interaktif pakai tombol 🃏\n` +
-            `\`${prefix} fish\` : Mancing ikan seru 🎣\n\n` +
+            `\`${prefix} cf [taruhan/all]\` : Lempar koin beranimasi 🪙\n` +
+            `\`${prefix} bj [taruhan/all]\` : Blackjack minimalis interaktif 🃏\n` +
+            `\`${prefix} fish\` : Mancing kolam air UwU interaktif 🎣\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` : Cek latency bot\n` +
             `\`${prefix} clear <1-100>\` : Clear chat spam\n` +
@@ -308,216 +311,168 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send(`✅ GIF **${kategori}** diperbarui!`);
             }
 
-            // --- 🎰 MINI-GAME: SLOT BERANIMASI (50% Win Rate & Max Bet All) ---
+            // =========================================================
+            // 🎰 1. MINI-GAME: SLOT (Gaya Animasi & Format God Bot)
+            // =========================================================
             if (command === 'slot' || command === 'slt') {
+                const balance = getUserBalance(userId);
                 const betInput = args[0]?.toLowerCase();
-                let betAmount = 1000;
+                let bet = betInput === 'all' ? balance : parseInt(betInput);
 
-                if (betInput === 'all') {
-                    betAmount = 1000000;
-                } else if (betInput && !isNaN(parseInt(betInput))) {
-                    betAmount = parseInt(betInput);
+                if (isNaN(bet) || bet <=0) return message.reply('Format taruhan salah! Contoh: `!pai slot 250000` atau `!pai slot all`');
+                if (balance < bet) return message.reply('Saldo koin lu kurang, bro!');
+
+                setUserBalance(userId, balance - bet);
+                const slotItems = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎'];
+
+                let msg = await message.channel.send(`__SLOTS__\n| 🎰 | 🎰 | 🎰 |  ppai bet 🇽  ${bet.toLocaleString()}`);
+                await sleep(700);
+
+                let r1 = slotItems[Math.floor(Math.random() * slotItems.length)];
+                let r2 = slotItems[Math.floor(Math.random() * slotItems.length)];
+                let r3 = slotItems[Math.floor(Math.random() * slotItems.length)];
+
+                await msg.edit(`__SLOTS__\n| ${r1} | 🎰 | 🎰 |  ppai bet 🇽  ${bet.toLocaleString()}`);
+                await sleep(600);
+                await msg.edit(`__SLOTS__\n| ${r1} | ${r2} | 🎰 |  ppai bet 🇽  ${bet.toLocaleString()}`);
+                await sleep(600);
+
+                let win = (r1 === r2 && r2 === r3);
+                let payout = win ? bet * 3 : 0;
+                let currentBal = getUserBalance(userId);
+
+                if (win) {
+                    setUserBalance(userId, currentBal + payout);
+                    await msg.edit(`__SLOTS__\n| ${r1} | ${r2} | ${r3} |  ppai bet 🇽  ${bet.toLocaleString()}\n\n🎉 And won **${payout.toLocaleString()}** koin!`);
+                } else {
+                    await msg.edit(`__SLOTS__\n| ${r1} | ${r2} | ${r3} |  ppai bet 🇽  ${bet.toLocaleString()}\n\n❌ and won nothing... :c`);
                 }
-
-                const currentBal = getUserBalance(userId);
-                if (currentBal < betAmount) {
-                    return message.channel.send(`❌ Saldo kamu kurang! Saldo kamu saat ini: **${currentBal.toLocaleString()} Koin**`);
-                }
-
-                const fruits = ['🍒', '🍋', '🍉', '🍇', '💎', '⭐', '7️⃣'];
-                const getRandomSpin = () => [
-                    fruits[Math.floor(Math.random() * fruits.length)],
-                    fruits[Math.floor(Math.random() * fruits.length)],
-                    fruits[Math.floor(Math.random() * fruits.length)]
-                ];
-
-                const spin1 = getRandomSpin();
-                const msg = await message.channel.send(`🎰 **SPINNING... (Taruhan: ${betAmount.toLocaleString()})**\n| 🔄 | 🔄 | 🔄 |\n` + `| ${spin1.join(' | ')} |`);
-
-                setTimeout(async () => {
-                    const spin2 = getRandomSpin();
-                    await msg.edit(`🎰 **SPINNING...**\n| 🔄 | 🔄 | 🔄 |\n` + `| ${spin2.join(' | ')} |`).catch(() => {});
-                }, 600);
-
-                setTimeout(async () => {
-                    const isWin = Math.random() < 0.5;
-                    let finalSpin;
-                    let resultText = "";
-                    let reward = 0;
-
-                    if (isWin) {
-                        const winType = Math.random();
-                        if (winType < 0.3) {
-                            const f = fruits[Math.floor(Math.random() * fruits.length)];
-                            finalSpin = [f, f, f];
-                            reward = betAmount * 3;
-                            resultText = `🔥 **JACKPOT EPIC! MENANG ${reward.toLocaleString()} Koin!** 💎💎💎`;
-                        } else {
-                            const f1 = fruits[Math.floor(Math.random() * fruits.length)];
-                            let f2;
-                            do { f2 = fruits[Math.floor(Math.random() * fruits.length)]; } while (f2 === f1);
-                            finalSpin = [f1, f1, f2];
-                            reward = betAmount * 1.5;
-                            resultText = `✨ **Dapet 2 buah sama! MENANG ${reward.toLocaleString()} Koin!**`;
-                        }
-                        setUserBalance(userId, currentBal - betAmount + reward);
-                    } else {
-                        const f1 = fruits[Math.floor(Math.random() * fruits.length)];
-                        let f2, f3;
-                        do {
-                            f2 = fruits[Math.floor(Math.random() * fruits.length)];
-                            f3 = fruits[Math.floor(Math.random() * fruits.length)];
-                        } while (f1 === f2 && f2 === f3);
-                        finalSpin = [f1, f2, f3];
-                        reward = betAmount;
-                        setUserBalance(userId, currentBal - betAmount);
-                        resultText = `❌ **Kalah! Kehilangan ${reward.toLocaleString()} Koin!**`;
-                    }
-
-                    const updatedBal = getUserBalance(userId);
-                    const embed = new EmbedBuilder()
-                        .setColor(isWin ? '#2ECC71' : '#E74C3C')
-                        .setTitle(`🎰 Slot Machine - ${message.author.username}`)
-                        .setDescription(`| ${finalSpin.join(' | ')} |\n\n${resultText}\n💳 Sisa Saldo: **${updatedBal.toLocaleString()} Koin**`);
-
-                    await msg.edit({ content: null, embeds: [embed] }).catch(() => {});
-                }, 1200);
                 return;
             }
 
-            // --- 🪙 MINI-GAME: COINFLIP BERANIMASI ---
+            // =========================================================
+            // 🪙 2. MINI-GAME: COINFLIP (Gaya Narasi God Bot)
+            // =========================================================
             if (command === 'cf' || command === 'coinflip') {
-                let choice = args[0]?.toLowerCase();
-                let betInput = args[1]?.toLowerCase();
-                let userChoice = 'HEADS (Kepala)';
-                let betAmount = 1000;
+                const balance = getUserBalance(userId);
+                let betInput = args[0]?.toLowerCase();
+                let bet = betInput === 'all' ? balance : parseInt(betInput);
 
-                if (!choice) {
-                    userChoice = 'HEADS (Kepala)';
-                } else if (['head', 'h'].includes(choice)) {
-                    userChoice = 'HEADS (Kepala)';
-                } else if (['tail', 't'].includes(choice)) {
-                    userChoice = 'TAILS (Buntut)';
-                } else if (choice === 'all') {
-                    betAmount = 1000000;
-                    userChoice = 'HEADS (Kepala)';
-                } else if (!isNaN(parseInt(choice))) {
-                    betAmount = parseInt(choice);
-                    userChoice = 'HEADS (Kepala)';
+                if (isNaN(bet) || bet <= 0) return message.reply('Format salah! Contoh: `!pai cf 250000` atau `!pai cf all`');
+                if (balance < bet) return message.reply('Saldo koin kurang!');
+
+                setUserBalance(userId, balance - bet);
+
+                let msg = await message.channel.send(`🪙 ppai spent 🪙 **${bet.toLocaleString()}** and chose **heads**\nThe coin spins...`);
+                await sleep(1200);
+
+                let isWin = Math.random() < 0.5;
+                let payout = isWin ? bet * 2 : 0;
+                let currentBal = getUserBalance(userId);
+
+                if (isWin) {
+                    setUserBalance(userId, currentBal + payout);
+                    await msg.edit(`🪙 ppai spent 🪙 **${bet.toLocaleString()}** and chose **heads**\nThe coin spins... 🪙, and you won **${payout.toLocaleString()}**!`);
+                } else {
+                    await msg.edit(`🪙 ppai spent 🪙 **${bet.toLocaleString()}** and chose **heads**\nThe coin spins... 🪙, and you lost.`);
                 }
+                return;
+            }
 
-                if (betInput === 'all') {
-                    betAmount = 1000000;
-                } else if (betInput && !isNaN(parseInt(betInput))) {
-                    betAmount = parseInt(betInput);
+            // =========================================================
+            // 🃏 3. MINI-GAME: BLACKJACK (Gaya Minimalis God Bot)
+            // =========================================================
+            if (command === 'bj' || command === 'blackjack') {
+                const balance = getUserBalance(userId);
+                let betInput = args[0]?.toLowerCase();
+                let bet = betInput === 'all' ? balance : parseInt(betInput);
+
+                if (isNaN(bet) || bet <= 0) return message.reply('Format salah! Contoh: `!pai bj 250000` atau `!pai bj all`');
+                if (balance < bet) return message.reply('Saldo tidak cukup!');
+
+                setUserBalance(userId, balance - bet);
+
+                let p1 = Math.floor(Math.random() * 8) + 2;
+                let p2 = Math.floor(Math.random() * 8) + 2;
+                let pTotal = p1 + p2;
+
+                let d1 = Math.floor(Math.random() * 8) + 2;
+                let dHidden = Math.floor(Math.random() * 8) + 2;
+
+                let msg = await message.channel.send(
+                    `🎰 **${message.author.username}**, you bet **${bet.toLocaleString()}** to play blackjack\n\n` +
+                    `**Dealer [${d1}+?]**\n` +
+                    `🃏 🃏\n\n` +
+                    `**${message.author.username} [${pTotal}]**\n` +
+                    `🃏 [${p1}] 🃏 [${p2}]`
+                );
+
+                await sleep(1500);
+
+                let dTotal = d1 + dHidden;
+                let win = pTotal <= 21 && (dTotal > 21 || pTotal > dTotal);
+                let payout = win ? bet * 2 : 0;
+                let currentBal = getUserBalance(userId);
+
+                if (win) {
+                    setUserBalance(userId, currentBal + payout);
+                    await msg.edit(`🎰 **${message.author.username}**, you bet **${bet.toLocaleString()}** to play blackjack\n\n**Dealer [${dTotal}]**\n**${message.author.username} [${pTotal}]**\n\n🎉 - You won **${payout.toLocaleString()}** cowoncy!`);
+                } else {
+                    await msg.edit(`🎰 **${message.author.username}**, you bet **${bet.toLocaleString()}** to play blackjack\n\n**Dealer [${dTotal}]**\n**${message.author.username} [${pTotal}]**\n\n❌ - You lost your bet.`);
                 }
+                return;
+            }
 
-                const currentBal = getUserBalance(userId);
-                if (currentBal < betAmount) {
-                    return message.channel.send(`❌ Saldo kamu kurang! Saldo kamu saat ini: **${currentBal.toLocaleString()} Koin**`);
-                }
+            // =========================================================
+            // 🎣 4. MINI-GAME: FISHING (Gaya Kolam Air UwU Bot + Tombol Reel)
+            // =========================================================
+            if (command === 'fish' || command === 'mancing') {
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`reel_${userId}`)
+                        .setLabel('Reel')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🎣')
+                );
 
-                const msg = await message.channel.send(`🪙 **Tossing the coin... (Taruhan: ${betAmount.toLocaleString()})**\n| 🔄 | 🔄 | 🔄 |`);
+                const fishText = 
+                    `───────────────────────\n` +
+                    `~~~~~~~~~~~~~~~~~~~~~~~\n` +
+                    `  🐟                  \n` +
+                    `~~~~~~~~~~~~~~~~~~~~~~~\n` +
+                    `🟡🟡🟡🟡🟡🟡🟡🟡🟡🟡\n\n` +
+                    `**Press 🎣 Reel to hook it!**`;
 
-                setTimeout(async () => {
-                    await msg.edit(`🪙 **Tossing the coin...**\n| 🪙 | 🦅 | 🪙 |`).catch(() => {});
-                }, 500);
+                const msg = await message.channel.send({
+                    content: `🎣 **@${message.author.username} — something is biting!**\n\n` + fishText,
+                    components: [row]
+                });
 
-                setTimeout(async () => {
-                    const userWins = Math.random() < 0.5;
-                    let result;
+                const collector = msg.createMessageComponentCollector({ time: 10000 });
 
-                    if (userWins) {
-                        result = userChoice.includes('HEADS') ? 'HEADS 🪙 (Kepala)' : 'TAILS 🦅 (Buntut)';
-                        setUserBalance(userId, currentBal + betAmount);
-                    } else {
-                        result = userChoice.includes('HEADS') ? 'TAILS 🦅 (Buntut)' : 'HEADS 🪙 (Kepala)';
-                        setUserBalance(userId, currentBal - betAmount);
+                collector.on('collect', async i => {
+                    if (i.user.id !== userId) {
+                        return i.reply({ content: 'Ini bukan pancingan lu, bro!', ephemeral: true });
                     }
 
-                    const updatedBal = getUserBalance(userId);
-                    const embed = new EmbedBuilder()
-                        .setColor(userWins ? '#2ECC71' : '#E74C3C')
-                        .setTitle(`🪙 Coinflip Result - ${message.author.username}`)
-                        .setDescription(
-                            `Pilihan lu: **${userChoice}**\n` +
-                            `Hasil koin: **${result}**\n\n` +
-                            (userWins ? `🎉 **MENANG! +${betAmount.toLocaleString()} Koin!**` : `❌ **KALAH! -${betAmount.toLocaleString()} Koin!**`) +
-                            `\n💳 Sisa Saldo: **${updatedBal.toLocaleString()} Koin**`
-                        );
+                    const fishList = ['Cumi Raksasa (Rare)', 'Pari Kecil (Common)', 'Hiu Megalodon (Legendary 🔥)', 'Ikan Buntal (Uncommon)'];
+                    const caught = fishList[Math.floor(Math.random() * fishList.length)];
 
-                    await msg.edit({ content: null, embeds: [embed] }).catch(() => {});
-                }, 1000);
+                    await i.update({
+                        content: `🎣 **Mancing Mania - Berhasil!**\n\n✨ Kamu berhasil dapat: 🐟 **${caught}**`,
+                        components: []
+                    });
+                });
+
+                collector.on('end', async collected => {
+                    if (collected.size === 0) {
+                        await msg.edit({
+                            content: `⏰ **Waktu habis!** Ikan nya lepas karena terlalu lama ditarik.`,
+                            components: []
+                        }).catch(() => {});
+                    }
+                });
                 return;
-            }
-
-            // --- 🃏 MINI-GAME: BLACKJACK INTERAKTIF PAKAI TOMBOL ---
-            if (command === 'bj' || command === 'blackjack') {
-                const betInput = args[0]?.toLowerCase();
-                let betAmount = 1000;
-
-                if (betInput === 'all') {
-                    betAmount = 1000000;
-                } else if (betInput && !isNaN(parseInt(betInput))) {
-                    betAmount = parseInt(betInput);
-                }
-
-                const currentBal = getUserBalance(userId);
-                if (currentBal < betAmount) {
-                    return message.channel.send(`❌ Saldo kamu kurang! Saldo kamu saat ini: **${currentBal.toLocaleString()} Koin**`);
-                }
-
-                const drawCard = () => Math.floor(Math.random() * 10) + 1;
-                let pCards = [drawCard(), drawCard()];
-                let dCards = [drawCard(), drawCard()];
-
-                let pTotal = pCards.reduce((a, b) => a + b, 0);
-                let dTotal = dCards.reduce((a, b) => a + b, 0);
-
-                const getEmbed = (status = 'main') => {
-                    const color = status === 'win' ? '#2ECC71' : status === 'lose' ? '#E74C3C' : getRandomColor();
-                    let desc = `👤 **Kartu Kamu:** [ ${pCards.join(' ] [ ')} ] (Total: **${pTotal}**)\n` +
-                               `🤖 **Kartu Dealer:** ` + (status === 'main' ? `[ ${dCards[0]} ] [ ❓ ]` : `[ ${dCards.join(' ] [ ')} ] (Total: **${dTotal}**)`);
-                    
-                    if (status === 'win') desc += `\n\n🎉 **MENANG! +${betAmount.toLocaleString()} Koin!**`;
-                    else if (status === 'lose') desc += `\n\n❌ **KALAH! -${betAmount.toLocaleString()} Koin!**`;
-                    else if (status === 'push') desc += `\n\n🤝 **SERI (PUSH)! Saldo dikembalikan.**`;
-
-                    return new EmbedBuilder()
-                        .setColor(color)
-                        .setTitle(`🃏 Blackjack - ${message.author.username} (Taruhan: ${betAmount.toLocaleString()})`)
-                        .setDescription(desc);
-                };
-
-                const getButtons = (disabled = false) => {
-                    return new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId(`bj_hit_${userId}_${betAmount}`).setLabel('Hit (Tambah)').setEmoji('➕').setStyle(ButtonStyle.Primary).setDisabled(disabled),
-                        new ButtonBuilder().setCustomId(`bj_stand_${userId}_${betAmount}`).setLabel('Stand (Tahan)').setEmoji('🛑').setStyle(ButtonStyle.Danger).setDisabled(disabled)
-                    );
-                };
-
-                const gameMsg = await message.channel.send({ embeds: [getEmbed('main')], components: [getButtons(false)] });
-                return;
-            }
-
-            // --- 🎣 MINI-GAME: MANCING ---
-            if (command === 'fish' || command === 'mancing') {
-                const fishes = [
-                    { name: '🐟 Ikan Lele Biasa', rarity: 'Common' },
-                    { name: '🐠 Ikan Hias Lucu', rarity: 'Common' },
-                    { name: '🦈 Hiu Megalodon', rarity: 'Epic' },
-                    { name: '🦑 Cumi Raksasa', rarity: 'Rare' },
-                    { name: '🥾 Sepatu Rusak', rarity: 'Trash 💀' },
-                    { name: '💎 Berlian Tenggelam di Laut', rarity: 'Legendary 🔥' }
-                ];
-
-                const caught = fishes[Math.floor(Math.random() * fishes.length)];
-                const embed = new EmbedBuilder()
-                    .setColor(getRandomColor())
-                    .setTitle(`🎣 Mancing Mania - ${message.author.username}`)
-                    .setDescription(`Lagi sabar nunggu kail ditarik...\n\n🎉 **Kamu berhasil dapat:** **${caught.name}**\n🏷️ **Kelangkaan:** \`${caught.rarity}\``);
-
-                return message.channel.send({ embeds: [embed] });
             }
 
             // --- 🛠️ UTILITY COMMANDS HANDLER ---
@@ -600,7 +555,7 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // --- 🎯 AUTOMATIC REMINDERS ---
+        // --- 🎯 AUTOMATIC REMINDERS (UTUH TIDAK BERUBAH) ---
         const handleTimer = (type, timeMs, textMsg, modeKey, gifUrl) => {
             const timerKey = `${userId}_${type}_${message.channel.id}`;
             if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
@@ -666,7 +621,6 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
-        const parts = interaction.customId.split('_');
         const guildId = interaction.guild?.id || 'dm';
         const serverCfg = getServerConfig(guildId);
 
@@ -681,9 +635,9 @@ client.on('interactionCreate', async (interaction) => {
                 .setDescription(
                     `\`${serverCfg.botPrefix} bal\` : Cek saldo koin\n` +
                     `\`${serverCfg.botPrefix} slot [all/jumlah]\` : Mesin slot beranimasi\n` +
-                    `\`${serverCfg.botPrefix} cf [head/tail/all]\` : Lempar koin beranimasi\n` +
-                    `\`${serverCfg.botPrefix} bj [all/jumlah]\` : Main Blackjack interaktif\n` +
-                    `\`${serverCfg.botPrefix} fish\` : Mancing ikan\n` +
+                    `\`${serverCfg.botPrefix} cf [all/jumlah]\` : Lempar koin beranimasi\n` +
+                    `\`${serverCfg.botPrefix} bj [all/jumlah]\` : Blackjack minimalis\n` +
+                    `\`${serverCfg.botPrefix} fish\` : Mancing ikan interaktif\n` +
                     `\`${serverCfg.botPrefix} ping\` : Cek delay respon bot\n` +
                     `\`${serverCfg.botPrefix} clear <jumlah>\` : Hapus chat spam\n` +
                     `\`${serverCfg.botPrefix} user [@user]\` : Tampilkan info user\n` +
@@ -698,93 +652,7 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
         }
 
-        // --- BUTTON BLACKJACK (HIT / STAND) ---
-        if (parts[0] === 'bj') {
-            const action = parts[1]; // hit / stand
-            const ownerId = parts[2];
-            const betAmount = parseInt(parts[3]);
-
-            if (interaction.user.id !== ownerId) {
-                return interaction.reply({ content: '❌ Ini bukan game Blackjack kamu!', ephemeral: true });
-            }
-
-            const currentBal = getUserBalance(ownerId);
-
-            // Parsing ulang kartu dari embed sebelumnya
-            const embedMsg = interaction.message.embeds[0];
-            const desc = embedMsg.description;
-            
-            // Ekstrak kartu user & dealer dari deskripsi embed
-            const pMatch = desc.match(/👤 \*\*Kartu Kamu:\*\* \[ (.*?) \] \(Total: \*\*(\d+)\*\*\)/);
-            const dMatch = desc.match(/🤖 \*\*Kartu Dealer:\*\* \[ (.*?) \] \(Total: \*\*(\d+)\*\)/) || desc.match(/🤖 \*\*Kartu Dealer:\*\* \[ (.*?) \] \[ ❓ \]/);
-
-            if (!pMatch) return interaction.update({ content: '❌ Terjadi kesalahan game.', components: [] });
-
-            let pCards = pMatch[1].split(' ] [ ');
-            let pTotal = parseInt(pMatch[2]);
-            let dCards = dMatch[1].split(' ] [ ');
-            let dTotal = dMatch[2] ? parseInt(dMatch[2]) : Math.floor(Math.random() * 6) + 5; // Kartu dealer tersembunyi
-
-            const drawCard = () => Math.floor(Math.random() * 10) + 1;
-
-            if (action === 'hit') {
-                const newCard = drawCard();
-                pCards.push(newCard);
-                pTotal += newCard;
-
-                if (pTotal > 21) {
-                    // BUST (Kalah)
-                    setUserBalance(ownerId, currentBal - betAmount);
-                    const newEmbed = new EmbedBuilder()
-                        .setColor('#E74C3C')
-                        .setTitle(`🃏 Blackjack - ${interaction.user.username} (Bust!)`)
-                        .setDescription(`👤 **Kartu Kamu:** [ ${pCards.join(' ] [ ')} ] (Total: **${pTotal}** - BUST! 💥)\n🤖 **Kartu Dealer:** [ ${dCards.join(' ] [ ')} ] (Total: **${dTotal}**)\n\n❌ **KALAH! Kehilangan ${betAmount.toLocaleString()} Koin!**\n💳 Sisa Saldo: **${getUserBalance(ownerId).toLocaleString()} Koin**`);
-                    return interaction.update({ embeds: [newEmbed], components: [] });
-                } else {
-                    const newEmbed = new EmbedBuilder()
-                        .setColor(getRandomColor())
-                        .setTitle(`🃏 Blackjack - ${interaction.user.username} (Taruhan: ${betAmount.toLocaleString()})`)
-                        .setDescription(`👤 **Kartu Kamu:** [ ${pCards.join(' ] [ ')} ] (Total: **${pTotal}**)\n🤖 **Kartu Dealer:** [ ${dCards[0]} ] [ ❓ ]`);
-                    return interaction.update({ embeds: [newEmbed], components: [interaction.message.components[0]] });
-                }
-            } 
-            
-            if (action === 'stand') {
-                // Dealer nambah kartu kalau total di bawah 17
-                while (dTotal < 17) {
-                    const dNew = drawCard();
-                    dCards.push(dNew);
-                    dTotal += dNew;
-                }
-
-                let gameStatus = 'push';
-                let resText = '';
-
-                if (dTotal > 21 || pTotal > dTotal) {
-                    gameStatus = 'win';
-                    setUserBalance(ownerId, currentBal + betAmount);
-                    resText = `🎉 **MENANG! +${betAmount.toLocaleString()} Koin!**`;
-                } else if (pTotal < dTotal) {
-                    gameStatus = 'lose';
-                    setUserBalance(ownerId, currentBal - betAmount);
-                    resText = `❌ **KALAH! -${betAmount.toLocaleString()} Koin!**`;
-                } else {
-                    resText = `🤝 **SERI (PUSH)! Saldo aman.**`;
-                }
-
-                const updatedBal = getUserBalance(ownerId);
-                const finalEmbed = new EmbedBuilder()
-                    .setColor(gameStatus === 'win' ? '#2ECC71' : gameStatus === 'lose' ? '#E74C3C' : '#F1C40F')
-                    .setTitle(`🃏 Blackjack Result - ${interaction.user.username}`)
-                    .setDescription(
-                        `👤 **Kartu Kamu:** [ ${pCards.join(' ] [ ')} ] (Total: **${pTotal}**)\n` +
-                        `🤖 **Kartu Dealer:** [ ${dCards.join(' ] [ ')} ] (Total: **${dTotal}**)\n\n` +
-                        `${resText}\n💳 Sisa Saldo: **${updatedBal.toLocaleString()} Koin**`
-                    );
-
-                return interaction.update({ embeds: [finalEmbed], components: [] });
-            }
-        }
+        const parts = interaction.customId.split('_');
 
         if (parts[0] === 'toggle') {
             const [, key, type, ownerId] = parts;
