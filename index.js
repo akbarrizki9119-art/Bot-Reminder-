@@ -62,17 +62,21 @@ function getUserConfig(userId) {
 
 function getRpgPlayer(userId, username = "Hero") {
     if (!rpgPlayers.has(userId)) {
-        // Karakter utama lu diset [L] Legendary otomatis!
-        const mainHero = { name: `${username} (Leader)`, class: 'Legendary Hero', tier: 'Legendary', tierBadge: '[L]', atkBonus: 25, defBonus: 15 };
+        // Karakter utama lu diset paling kuat mutlak (ATK 100, DEF 100)
+        const mainHero = { 
+            id: 'leader_' + userId,
+            name: `${username} (Leader)`, 
+            role: 'Supreme Leader', 
+            tier: 'Legendary', 
+            tierBadge: '[L]', 
+            atk: 100, 
+            def: 100,
+            equipped: { weapon: null, armor: null, helmet: null }
+        };
         rpgPlayers.set(userId, {
             name: username,
-            hp: 100,
-            maxHp: 100,
-            atk: 15,
-            def: 5,
             floor: 1,
             inventory: [],
-            equipped: { weapon: null, armor: null, helmet: null },
             party: [mainHero], 
             roster: [mainHero] 
         });
@@ -92,14 +96,13 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
         .setDescription(
             `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
             `**🎮 GAME REMINDERS & AUTOHUNT (WHB/GHB)**\n` +
-            `\`${prefix} owo\` | \`${prefix} owoh\` | \`${prefix} godh\` | \`${prefix} owopray\` | \`${prefix} owovote\`\n` +
-            `*(Ketik \`whb 1\` atau \`ghb 1\` untuk baca timer auto hunt OwO otomatis via DM)*\n\n` +
-            `**⚔️ DUNGEON RPG & COMPANION ZOO**\n` +
-            `\`${prefix} dungeon\` (atau \`${prefix} dg\`) : Masuk dungeon, lawan monster, & cari companion\n` +
-            `\`${prefix} inv\` : Cek status total, gear, & inventory ([L]/[E]/[R]/[U]/[C])\n` +
-            `\`${prefix} equip <no>\` : Pakai item dari inventory\n` +
+            `\`${prefix} owo\` | \`${prefix} owoh\` | \`${prefix} godh\` | \`${prefix} owopray\` | \`${prefix} owovote\`\n\n` +
+            `**⚔️ DUNGEON RPG & TIM SYSTEM**\n` +
+            `\`${prefix} dungeon\` (atau \`${prefix} dg\`) : Masuk dungeon, cari item & rekrut companion\n` +
+            `\`${prefix} inv\` : Cek inventory rapih & pasang gear (\`${prefix} equip <no>\` / \`${prefix} sell <no>\`)\n` +
+            `\`${prefix} zoo\` : Lihat roster companion rapih (\`${prefix} release <no>\` untuk lepas)\n` +
             `\`${prefix} party\` : Kelola tim aktif (Maksimal 3 orang)\n` +
-            `\`${prefix} zoo\` : Koleksi companion yang ditemui di dungeon\n\n` +
+            `\`${prefix} givegear <no_zoo> <no_item>\` : Pasang senjata/armor ke companion!\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` | \`${prefix} clear\` | \`${prefix} user\` | \`${prefix} uptime\` | \`${prefix} server\` | \`${prefix} avatar\``
         )
@@ -180,13 +183,10 @@ client.on('messageCreate', async (message) => {
 
         // --- 🤖 DETEKSI PESAN DARI BOT (OwO Bot / God Bot) ---
         if (message.author.bot) {
-            
-            // 1. Deteksi Captcha / Verification
             if (msgLower.includes("captcha") || msgLower.includes("verify")) {
                 message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`).catch(() => {});
             }
 
-            // 2. DETEKSI AUTOHUNT BOT (I WILL BE BACK IN)
             if (msgUpper.includes('I WILL BE BACK IN')) {
                 const hoursMatch = msgUpper.match(/(\d+)\s*H/i);
                 const minutesMatch = msgUpper.match(/(\d+)\s*M/i);
@@ -195,28 +195,14 @@ client.on('messageCreate', async (message) => {
                 let totalMs = 0;
                 let durationParts = [];
 
-                if (hoursMatch) {
-                    const h = parseInt(hoursMatch[1]);
-                    totalMs += h * 3600000;
-                    durationParts.push(`${h} Jam`);
-                }
-                if (minutesMatch) {
-                    const m = parseInt(minutesMatch[1]);
-                    totalMs += m * 60000;
-                    durationParts.push(`${m} Menit`);
-                }
-                if (secondsMatch) {
-                    const s = parseInt(secondsMatch[1]);
-                    totalMs += s * 1000;
-                    durationParts.push(`${s} Detik`);
-                }
+                if (hoursMatch) { const h = parseInt(hoursMatch[1]); totalMs += h * 3600000; durationParts.push(`${h} Jam`); }
+                if (minutesMatch) { const m = parseInt(minutesMatch[1]); totalMs += m * 60000; durationParts.push(`${m} Menit`); }
+                if (secondsMatch) { const s = parseInt(secondsMatch[1]); totalMs += s * 1000; durationParts.push(`${s} Detik`); }
 
                 const durationString = durationParts.join(' ') || 'beberapa saat';
-
                 let targetUser = message.mentions.users.first();
                 let huntTypeLabel = "OWO HUNTBOT";
 
-                // A. Cek dari reply pesan
                 if (!targetUser && message.reference) {
                     const refMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
                     if (refMsg && !refMsg.author.bot) {
@@ -225,25 +211,20 @@ client.on('messageCreate', async (message) => {
                     }
                 }
 
-                // B. Cari pesan user paling akhir sebelum respon OwO bot ini
                 if (!targetUser) {
                     const recentMsgs = await message.channel.messages.fetch({ limit: 6 }).catch(() => null);
                     if (recentMsgs) {
                         const huntKeywords = ['hb', 'ghb', 'whb', 'ah', 'w ah', 'autohunt', 'gah'];
                         const lastUserMsg = recentMsgs.find(m => !m.author.bot && huntKeywords.some(kw => m.content.toLowerCase().includes(kw)));
-                        
                         if (lastUserMsg) {
                             targetUser = lastUserMsg.author;
-                            if (lastUserMsg.content.toLowerCase().includes('ghb') || lastUserMsg.content.toLowerCase().includes('gah')) {
-                                huntTypeLabel = "GOD HUNTBOT";
-                            }
+                            if (lastUserMsg.content.toLowerCase().includes('ghb') || lastUserMsg.content.toLowerCase().includes('gah')) huntTypeLabel = "GOD HUNTBOT";
                         }
                     }
                 }
 
                 if (totalMs > 0 && targetUser) {
                     message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\``).catch(() => {});
-                    
                     setTimeout(async () => {
                         try {
                             await targetUser.send({
@@ -315,39 +296,37 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send(`✅ GIF **${kategori}** diperbarui!`);
             }
 
-            // --- ⚔️ DUNGEON RAID & RANDOM COMPANION ENCOUNTER ---
+            // --- ⚔️ DUNGEON RAID & COMPANION SYSTEM ---
             if (command === 'dungeon' || command === 'dg') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
-                const partyAtkBonus = player.party.reduce((acc, m) => acc + m.atkBonus, 0);
-                const partyDefBonus = player.party.reduce((acc, m) => acc + m.defBonus, 0);
+                let totalPartyAtk = 0;
+                let totalPartyDef = 0;
+                player.party.forEach(member => {
+                    let wStat = member.equipped?.weapon?.stat || 0;
+                    let aStat = member.equipped?.armor?.stat || 0;
+                    let hStat = member.equipped?.helmet?.stat || 0;
+                    totalPartyAtk += (member.atk + wStat);
+                    totalPartyDef += (member.def + aStat + hStat);
+                });
 
-                const enemyHp = 60 + (player.floor * 20);
-                const enemyAtk = 10 + (player.floor * 5);
+                const enemyHp = 80 + (player.floor * 25);
+                const enemyAtk = 15 + (player.floor * 6);
                 
                 const embed = new EmbedBuilder()
                     .setColor(getRandomColor())
                     .setTitle(`🗺️ Dungeon Raid - Floor ${player.floor}`)
-                    .setDescription(`👥 **Party Size:** \`${player.party.length}/3 Member\`\n⚠️ **Musuh Muncul!**\n❤️ Monster HP: \`${enemyHp}\`\n⚔️ Monster ATK: \`${enemyAtk}\`\n\n*Tim sedang bertarung...*`);
+                    .setDescription(`👥 **Active Party Size:** \`${player.party.length}/3 Member\`\n⚠️ **Musuh Muncul!**\n❤️ Monster HP: \`${enemyHp}\`\n⚔️ Monster ATK: \`${enemyAtk}\`\n\n*Tim sedang bertarung...*`);
                 
                 const sentMsg = await message.channel.send({ embeds: [embed] });
 
                 setTimeout(async () => {
-                    let weaponStat = player.equipped.weapon?.stat || 0;
-                    let armorStat = player.equipped.armor?.stat || 0;
-                    let helmetStat = player.equipped.helmet?.stat || 0;
-
-                    let totalAtk = player.atk + weaponStat + partyAtkBonus;
-                    let totalDef = player.def + armorStat + helmetStat + partyDefBonus;
-
-                    const playerPower = totalAtk * 3 + totalDef;
+                    const playerPower = totalPartyAtk * 3 + totalPartyDef;
                     const enemyPower = enemyHp + (enemyAtk * 2);
 
-                    if (playerPower >= enemyPower || Math.random() > 0.25) {
+                    if (playerPower >= enemyPower || Math.random() > 0.2) {
                         const roll = Math.random() * 100;
-                        let rarity = 'Common';
-                        let badge = '[C]';
-                        let color = '#95a5a6';
+                        let rarity = 'Common', badge = '[C]', color = '#95a5a6';
 
                         if (roll <= 2) { rarity = 'Legendary'; badge = '[L]'; color = '#f1c40f'; } 
                         else if (roll <= 8) { rarity = 'Epic'; badge = '[E]'; color = '#9b59b6'; } 
@@ -355,29 +334,26 @@ client.on('messageCreate', async (message) => {
                         else if (roll <= 45) { rarity = 'Uncommon'; badge = '[U]'; color = '#2ecc71'; }
 
                         let minMult = 1, maxMult = 1.5;
-                        if (rarity === 'Uncommon') { minMult = 1.6; maxMult = 2.5; }
-                        else if (rarity === 'Rare') { minMult = 2.6; maxMult = 4.0; }
-                        else if (rarity === 'Epic') { minMult = 4.1; maxMult = 6.5; }
-                        else if (rarity === 'Legendary') { minMult = 6.6; maxMult = 10.0; }
+                        if (rarity === 'Uncommon') { minMult = 1.6; maxMult = 2.2; }
+                        else if (rarity === 'Rare') { minMult = 2.3; maxMult = 3.2; }
+                        else if (rarity === 'Epic') { minMult = 3.3; maxMult = 4.5; }
+                        else if (rarity === 'Legendary') { minMult = 4.6; maxMult = 6.0; }
 
-                        const randomMult = minMult + Math.random() * (maxMult - minMult);
-
+                        const itemStat = Math.floor((player.floor * 3) * (minMult + Math.random() * (maxMult - minMult)));
                         const itemTypes = [
-                            { type: 'Weapon', name: 'Sword', emoji: '🗡️', base: player.floor * 4 },
-                            { type: 'Weapon', name: 'Bow', emoji: '🏹', base: player.floor * 4 },
-                            { type: 'Weapon', name: 'Staff', emoji: '🪄', base: player.floor * 4 },
-                            { type: 'Weapon', name: 'Dagger', emoji: '🗡️', base: player.floor * 4 },
-                            { type: 'Armor', name: 'Chestplate', emoji: '🛡️', base: player.floor * 3 },
-                            { type: 'Helmet', name: 'Helm', emoji: '⛑️', base: player.floor * 3 }
+                            { type: 'Weapon', name: 'Sword', emoji: '🗡️' },
+                            { type: 'Weapon', name: 'Bow', emoji: '🏹' },
+                            { type: 'Weapon', name: 'Staff', emoji: '🪄' },
+                            { type: 'Armor', name: 'Chestplate', emoji: '🛡️' },
+                            { type: 'Helmet', name: 'Helm', emoji: '⛑️' }
                         ];
-                        const selectedItemType = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+                        const selType = itemTypes[Math.floor(Math.random() * itemTypes.length)];
                         
-                        const itemStat = Math.floor(selectedItemType.base * randomMult);
                         const newItem = {
                             id: Date.now(),
-                            name: `${badge} ${rarity} ${selectedItemType.name}`,
-                            type: selectedItemType.type,
-                            emoji: selectedItemType.emoji,
+                            name: `${badge} ${rarity} ${selType.name}`,
+                            type: selType.type,
+                            emoji: selType.emoji,
                             rarity: rarity,
                             badge: badge,
                             stat: itemStat
@@ -385,29 +361,38 @@ client.on('messageCreate', async (message) => {
                         player.inventory.push(newItem);
 
                         let companionText = "";
-                        if (Math.random() <= 0.35) {
-                            const compNames = ['Aria the Rogue', 'Gideon the Knight', 'Lyra the Mage', 'Kaelen the Archer', 'Vespera the Priest', 'Thorin the Berserker'];
+                        if (Math.random() <= 0.4) {
+                            const compNames = ['Aria', 'Gideon', 'Lyra', 'Kaelen', 'Vespera', 'Thorin', 'Sylvia', 'Darius'];
+                            const roles = ['Attack', 'Magic', 'Tank', 'Support'];
                             const randomName = compNames[Math.floor(Math.random() * compNames.length)];
+                            const randomRole = roles[Math.floor(Math.random() * roles.length)];
                             
-                            const compRoll = Math.random() * 100;
+                            const cRoll = Math.random() * 100;
                             let cRarity = 'Common', cBadge = '[C]';
-                            if (compRoll <= 3) { cRarity = 'Legendary'; cBadge = '[L]'; }
-                            else if (compRoll <= 10) { cRarity = 'Epic'; cBadge = '[E]'; }
-                            else if (compRoll <= 25) { cRarity = 'Rare'; cBadge = '[R]'; }
-                            else if (compRoll <= 50) { cRarity = 'Uncommon'; cBadge = '[U]'; }
+                            if (cRoll <= 2) { cRarity = 'Legendary'; cBadge = '[L]'; }
+                            else if (cRoll <= 8) { cRarity = 'Epic'; cBadge = '[E]'; }
+                            else if (cRoll <= 20) { cRarity = 'Rare'; cBadge = '[R]'; }
+                            else if (cRoll <= 45) { cRarity = 'Uncommon'; cBadge = '[U]'; }
 
-                            let statBonusMultiplier = cRarity === 'Legendary' ? 15 : cRarity === 'Epic' ? 10 : cRarity === 'Rare' ? 6 : cRarity === 'Uncommon' ? 3 : 1;
+                            let baseAtkComp = Math.floor(10 + (player.floor * 1.5));
+                            let baseDefComp = Math.floor(5 + (player.floor * 1.0));
+                            if (cRarity === 'Legendary') { baseAtkComp = 35; baseDefComp = 25; }
+                            else if (cRarity === 'Epic') { baseAtkComp = 25; baseDefComp = 18; }
+                            else if (cRarity === 'Rare') { baseAtkComp = 18; baseDefComp = 12; }
+
                             const newCompanion = {
+                                id: 'comp_' + Date.now() + Math.random(),
                                 name: randomName,
-                                class: cRarity + ' Adventurer',
+                                role: randomRole,
                                 tier: cRarity,
                                 tierBadge: cBadge,
-                                atkBonus: player.floor * statBonusMultiplier,
-                                defBonus: Math.floor(player.floor * statBonusMultiplier * 0.5)
+                                atk: baseAtkComp,
+                                def: baseDefComp,
+                                equipped: { weapon: null, armor: null, helmet: null }
                             };
 
                             player.roster.push(newCompanion);
-                            companionText = `\n👤 **Companion Baru Ditemukan!**\n✨ **${cBadge} ${randomName}** (${cRarity}) masuk ke \`!zoo\`!`;
+                            companionText = `\n👤 **Orang Ditemukan!**\n✨ **${cBadge} ${randomName}** (${cRarity}) | Role: **${randomRole}** | ATK: \`${baseAtkComp}\`, DEF: \`${baseDefComp}\``;
                         }
 
                         player.floor += 1;
@@ -418,7 +403,7 @@ client.on('messageCreate', async (message) => {
                             .setDescription(
                                 `Tim berhasil mengalahkan monster! ⚔️\n\n` +
                                 `🎁 **Item Drop Didapat:**\n` +
-                                `${badge} **[${rarity}] ${selectedItemType.emoji} ${selectedItemType.name}** (+${itemStat} ${selectedItemType.type === 'Weapon' ? 'ATK' : 'DEF'})` +
+                                `${badge} **[${rarity}] ${selType.emoji} ${selType.name}** (+${itemStat} ${selType.type === 'Weapon' ? 'ATK' : 'DEF'})` +
                                 `${companionText}\n\n` +
                                 `✨ Naik ke **Floor ${player.floor}**! Ketik \`${usedPrefix} dungeon\` lagi untuk lanjut.`
                             );
@@ -428,44 +413,51 @@ client.on('messageCreate', async (message) => {
                         const loseEmbed = new EmbedBuilder()
                             .setColor('#e74c3c')
                             .setTitle(`💀 Defeat!`)
-                            .setDescription(`Tim kamu terlalu lemah di Floor ${player.floor}! Perkuat party atau equip gear yang lebih bagus.`);
+                            .setDescription(`Tim kamu terlalu lemah di Floor ${player.floor}! Pasang senjata/armor ke companion atau tambah member party!`);
                         await sentMsg.edit({ embeds: [loseEmbed] });
                     }
                 }, 2000);
                 return;
             }
 
-            // --- 🎒 INVENTORY DISPLAY ---
+            // --- 🎒 INVENTORY UTAMA & TAMPILAN RAPI ---
             if (command === 'inv' || command === 'inventory') {
                 const player = getRpgPlayer(userId, message.author.username);
-                
-                let wStat = player.equipped.weapon?.stat || 0;
-                let aStat = player.equipped.armor?.stat || 0;
-                let hStat = player.equipped.helmet?.stat || 0;
-                let partyAtk = player.party.reduce((acc, m) => acc + m.atkBonus, 0);
-                let partyDef = player.party.reduce((acc, m) => acc + m.defBonus, 0);
+                const leader = player.party[0];
 
-                let totalHp = player.maxHp + (hStat * 2);
-                let totalAtk = player.atk + wStat + partyAtk;
-                let totalDef = player.def + aStat + hStat + partyDef;
+                let wStat = leader.equipped.weapon?.stat || 0;
+                let aStat = leader.equipped.armor?.stat || 0;
+                let hStat = leader.equipped.helmet?.stat || 0;
 
-                let invList = player.inventory.length === 0 ? 'Inventory kosong! Main dungeon dulu (`!dungeon`).' : player.inventory.map((item, idx) => `\`[${idx + 1}]\` ${item.badge || ''} ${item.emoji} **${item.name}** (+${item.stat})`).join('\n');
+                let totalAtk = leader.atk + wStat;
+                let totalDef = leader.def + aStat + hStat;
+
+                // Tampilan inventory dirapikan per baris list rapi
+                let invList = player.inventory.length === 0 
+                    ? '*Inventory kosong! Jelajahi dungeon (`!dungeon`).*' 
+                    : player.inventory.map((item, idx) => `\`[${idx + 1}]\` ${item.emoji} **${item.name}** ➔ \`+${item.stat} ${item.type === 'Weapon' ? 'ATK' : 'DEF'}\``).join('\n');
                 
                 const embed = new EmbedBuilder()
                     .setColor(getRandomColor())
-                    .setTitle(`🎒 ${message.author.username}'s Inventory & Stats`)
-                    .setDescription(
-                        `❤️ **Total HP:** \`${totalHp}\`\n` +
-                        `⚔️ **Total ATK:** \`${totalAtk}\` (Base: ${player.atk} | Gear: +${wStat} | Party: +${partyAtk})\n` +
-                        `🛡️ **Total DEF:** \`${totalDef}\` (Base: ${player.def} | Gear: +${aStat + hStat} | Party: +${partyDef})\n` +
-                        `🗺️ **Current Floor:** \`Floor ${player.floor}\` | 👥 **Party:** \`${player.party.length}/3\`\n\n` +
-                        `🛡️ **Equipped Gear:**\n` +
-                        `• Weapon: ${player.equipped.weapon ? `${player.equipped.weapon.badge || ''} ${player.equipped.weapon.emoji} ${player.equipped.weapon.name} (+${player.equipped.weapon.stat})` : 'None'}\n` +
-                        `• Armor: ${player.equipped.armor ? `${player.equipped.armor.badge || ''} ${player.equipped.armor.emoji} ${player.equipped.armor.name} (+${player.equipped.armor.stat})` : 'None'}\n` +
-                        `• Helmet: ${player.equipped.helmet ? `${player.equipped.helmet.badge || ''} ${player.equipped.helmet.emoji} ${player.equipped.helmet.name} (+${player.equipped.helmet.stat})` : 'None'}\n\n` +
-                        `📦 **Items List ([L] Legendary, [E] Epic, [R] Rare, [U] Uncommon, [C] Common):**\n${invList}\n\n` +
-                        `*Gunakan \`${usedPrefix} equip <nomor>\` atau \`${usedPrefix} use <nomor>\` untuk memakai item.*`
-                    );
+                    .setAuthor({ name: `${message.author.username}'s Inventory & Leader Status`, iconURL: message.author.displayAvatarURL() })
+                    .addFields(
+                        { 
+                            name: '👑 Supreme Leader Stats & Gear', 
+                            value: `⚔️ **ATK:** \`${totalAtk}\` (Base: ${leader.atk} | Gear: \`+${wStat}\`)\n` +
+                                   `🛡️ **DEF:** \`${totalDef}\` (Base: ${leader.def} | Gear: \`+${aStat + hStat}\`)\n\n` +
+                                   `• **Weapon:** ${leader.equipped.weapon ? `${leader.equipped.weapon.emoji} ${leader.equipped.weapon.name} (+${leader.equipped.weapon.stat})` : '`Kosong`'}\n` +
+                                   `• **Armor:** ${leader.equipped.armor ? `${leader.equipped.armor.emoji} ${leader.equipped.armor.name} (+${leader.equipped.armor.stat})` : '`Kosong`'}\n` +
+                                   `• **Helmet:** ${leader.equipped.helmet ? `${leader.equipped.helmet.emoji} ${leader.equipped.helmet.name} (+${leader.equipped.helmet.stat})` : '`Kosong`'}`,
+                            inline: false 
+                        },
+                        { 
+                            name: `📦 Inventory Items (${player.inventory.length})`, 
+                            value: invList, 
+                            inline: false 
+                        }
+                    )
+                    .setFooter({ text: `Gunakan ${usedPrefix} equip <no> | ${usedPrefix} sell <no>` });
+
                 return message.channel.send({ embeds: [embed] });
             }
 
@@ -474,31 +466,111 @@ client.on('messageCreate', async (message) => {
                 const index = parseInt(args[0]) - 1;
 
                 if (isNaN(index) || !player.inventory[index]) {
-                    return message.channel.send(`❌ Masukkan nomor item yang valid! Contoh: \`${usedPrefix} equip 1\` atau \`${usedPrefix} use 1\``);
+                    return message.channel.send(`❌ Masukkan nomor item inventory yang valid! Contoh: \`${usedPrefix} equip 1\``);
                 }
 
-                const item = player.inventory[index];
-                if (item.type === 'Weapon') player.equipped.weapon = item;
-                else if (item.type === 'Armor') player.equipped.armor = item;
-                else if (item.type === 'Helmet') player.equipped.helmet = item;
+                const item = player.inventory.splice(index, 1)[0];
+                const leader = player.party[0];
 
-                return message.channel.send(`✅ Berhasil memakai **${item.name}**! Status total karaktermu meningkat.`);
+                if (item.type === 'Weapon' && leader.equipped.weapon) player.inventory.push(leader.equipped.weapon);
+                if (item.type === 'Armor' && leader.equipped.armor) player.inventory.push(leader.equipped.armor);
+                if (item.type === 'Helmet' && leader.equipped.helmet) player.inventory.push(leader.equipped.helmet);
+
+                if (item.type === 'Weapon') leader.equipped.weapon = item;
+                else if (item.type === 'Armor') leader.equipped.armor = item;
+                else if (item.type === 'Helmet') leader.equipped.helmet = item;
+
+                return message.channel.send(`✅ Berhasil memasang **${item.name}** ke **Leader**!`);
             }
 
-            // --- 🐾 COMPANION ZOO ---
+            // --- 💰 FITUR JUAL SENJATA / ITEM ---
+            if (command === 'sell') {
+                const player = getRpgPlayer(userId, message.author.username);
+                const index = parseInt(args[0]) - 1;
+
+                if (isNaN(index) || !player.inventory[index]) {
+                    return message.channel.send(`❌ Masukkan nomor item inventory yang ingin dijual! Contoh: \`${usedPrefix} sell 1\``);
+                }
+
+                const soldItem = player.inventory.splice(index, 1)[0];
+                return message.channel.send(`🗑️ Berhasil menjual **${soldItem.name}** dari inventory agar tidak menuh-menuhin tas! 🪙`);
+            }
+
+            // --- 🤝 PASANG GEAR KE COMPANION ---
+            if (command === 'givegear' || command === 'equipmember') {
+                const player = getRpgPlayer(userId, message.author.username);
+                const zooIdx = parseInt(args[0]) - 1;
+                const invIdx = parseInt(args[1]) - 1;
+
+                if (isNaN(zooIdx) || !player.roster[zooIdx]) {
+                    return message.channel.send(`❌ Masukkan nomor companion dari \`${usedPrefix} zoo\` yang valid! Contoh: \`${usedPrefix} givegear 2 1\``);
+                }
+                if (isNaN(invIdx) || !player.inventory[invIdx]) {
+                    return message.channel.send(`❌ Masukkan nomor item dari inventory \`${usedPrefix} inv\` yang valid!`);
+                }
+
+                const companion = player.roster[zooIdx];
+                const item = player.inventory.splice(invIdx, 1)[0];
+
+                if (item.type === 'Weapon' && companion.equipped.weapon) player.inventory.push(companion.equipped.weapon);
+                if (item.type === 'Armor' && companion.equipped.armor) player.inventory.push(companion.equipped.armor);
+                if (item.type === 'Helmet' && companion.equipped.helmet) player.inventory.push(companion.equipped.helmet);
+
+                if (item.type === 'Weapon') companion.equipped.weapon = item;
+                else if (item.type === 'Armor') companion.equipped.armor = item;
+                else if (item.type === 'Helmet') companion.equipped.helmet = item;
+
+                return message.channel.send(`✅ Berhasil memberikan **${item.name}** ke companion **${companion.name}**!`);
+            }
+
+            // --- 🐾 COMPANION ZOO & TAMPILAN RAPI ---
             if (command === 'zoo' || command === 'roster') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
-                let zooList = player.roster.map((comp, idx) => `\`[${idx + 1}]\` **${comp.tierBadge} ${comp.name}** (${comp.tier}) -> +${comp.atkBonus} ATK, +${comp.defBonus} DEF`).join('\n');
+                // Tampilan zoo dirapikan dengan list bersih
+                let zooList = player.roster.map((comp, idx) => {
+                    let w = comp.equipped?.weapon ? `${comp.equipped.weapon.emoji}` : '📭';
+                    let a = comp.equipped?.armor ? `${comp.equipped.armor.emoji}` : '📭';
+                    let totalA = comp.atk + (comp.equipped?.weapon?.stat || 0);
+                    let totalD = comp.def + (comp.equipped?.armor?.stat || 0) + (comp.equipped?.helmet?.stat || 0);
+
+                    return `\`[${idx + 1}]\` ${comp.tierBadge} **${comp.name}** (${comp.role})\n` +
+                           `     └ ATK: \`${totalA}\` | DEF: \`${totalD}\` | Gear: ${w} ${a}`;
+                }).join('\n\n');
                 
                 const embed = new EmbedBuilder()
                     .setColor(getRandomColor())
-                    .setTitle(`🦁 ${message.author.username}'s Companion Zoo / Roster`)
-                    .setDescription(
-                        `Daftar petualang / orang yang berhasil kamu temui dan kumpulkan dari dalam dungeon:\n\n${zooList}\n\n` +
-                        `*Gunakan \`${usedPrefix} party add <nomor_zoo>\` untuk memasukkan mereka ke tim aktifmu!*`
-                    );
+                    .setAuthor({ name: `${message.author.username}'s Companion Zoo / Roster`, iconURL: message.author.displayAvatarURL() })
+                    .setDescription(`Daftar orang/companion yang berhasil kamu rekrut dari dalam dungeon:\n\n${zooList}`)
+                    .setFooter({ text: `Gunakan ${usedPrefix} party add <no> | ${usedPrefix} release <no> untuk melepas` });
+
                 return message.channel.send({ embeds: [embed] });
+            }
+
+            // --- 🏃 LEPAS / USIR COMPANION ---
+            if (command === 'release' || command === 'dismiss') {
+                const player = getRpgPlayer(userId, message.author.username);
+                const zooIdx = parseInt(args[0]) - 1;
+
+                if (isNaN(zooIdx) || zooIdx === 0 || !player.roster[zooIdx]) {
+                    return message.channel.send(`❌ Leader utama di nomor 1 tidak bisa dilepas! Pilih nomor companion lain di zoo.`);
+                }
+
+                const releasedComp = player.roster[zooIdx];
+
+                // Cek apakah companion sedang aktif di party, jika ya keluarkan dulu
+                const partyIdx = player.party.indexOf(releasedComp);
+                if (partyIdx !== -1) {
+                    player.party.splice(partyIdx, 1);
+                }
+
+                // Kembalikan gear miliknya ke inventory jika ada
+                if (releasedComp.equipped.weapon) player.inventory.push(releasedComp.equipped.weapon);
+                if (releasedComp.equipped.armor) player.inventory.push(releasedComp.equipped.armor);
+                if (releasedComp.equipped.helmet) player.inventory.push(releasedComp.equipped.helmet);
+
+                player.roster.splice(zooIdx, 1);
+                return message.channel.send(`👋 Berhasil melepaskan **${releasedComp.name}** kembali ke alam bebas (gear miliknya dikembalikan ke inventory).`);
             }
 
             // --- 👥 PARTY SYSTEM MANAGEMENT ---
@@ -512,7 +584,7 @@ client.on('messageCreate', async (message) => {
                     }
                     const zooIndex = parseInt(args[1]) - 1;
                     if (isNaN(zooIndex) || !player.roster[zooIndex]) {
-                        return message.channel.send(`❌ Masukkan nomor companion dari \`${usedPrefix} zoo\` yang valid! Contoh: \`${usedPrefix} party add 2\``);
+                        return message.channel.send(`❌ Masukkan nomor companion dari \`${usedPrefix} zoo\` yang valid!`);
                     }
 
                     const selectedComp = player.roster[zooIndex];
@@ -527,21 +599,26 @@ client.on('messageCreate', async (message) => {
                 if (subCmd === 'kick' || subCmd === 'remove') {
                     const memberIdx = parseInt(args[1]) - 1;
                     if (isNaN(memberIdx) || memberIdx === 0 || !player.party[memberIdx]) {
-                        return message.channel.send(`❌ Masukkan nomor member party yang valid untuk dikeluarkan (Leader utama di nomor 1 tidak bisa dikeluarkan)!`);
+                        return message.channel.send(`❌ Leader utama di nomor 1 tidak bisa dikeluarkan! Pilih nomor companion lain.`);
                     }
                     const removed = player.party.splice(memberIdx, 1);
                     return message.channel.send(`🗑️ Berhasil mengeluarkan **${removed[0].name}** dari party.`);
                 }
 
-                let partyList = player.party.map((m, idx) => `\`[${idx + 1}]\` ${m.tierBadge || '[C]'} **${m.name}** (${m.tier || 'Leader'}) -> +${m.atkBonus} ATK, +${m.defBonus} DEF`).join('\n');
+                let partyList = player.party.map((m, idx) => {
+                    let totalA = m.atk + (m.equipped?.weapon?.stat || 0);
+                    let totalD = m.def + (m.equipped?.armor?.stat || 0) + (m.equipped?.helmet?.stat || 0);
+                    return `\`[${idx + 1}]\` ${m.tierBadge} **${m.name}** | Role: **${m.role}**\n   ↳ ATK: \`${totalA}\` | DEF: \`${totalD}\``;
+                }).join('\n\n');
+
                 const embed = new EmbedBuilder()
                     .setColor(getRandomColor())
                     .setTitle(`👥 ${message.author.username}'s Active Party (${player.party.length}/3)`)
                     .setDescription(
-                        `Anggota tim yang membantumu bertarung di dungeon:\n\n${partyList}\n\n` +
+                        `Anggota tim yang ikut bertarung bersamamu:\n\n${partyList}\n\n` +
                         `*Perintah Party:*\n` +
-                        `• \`${usedPrefix} party add <nomor_zoo>\` : Masukkan dari \`${usedPrefix} zoo\`\n` +
-                        `• \`${usedPrefix} party kick <nomor>\` : Keluarkan dari party`
+                        `• \`${usedPrefix} party add <no_zoo>\` : Tambah dari \`!zoo\`\n` +
+                        `• \`${usedPrefix} party kick <no>\` : Keluarkan dari party`
                     );
                 return message.channel.send({ embeds: [embed] });
             }
@@ -560,7 +637,7 @@ client.on('messageCreate', async (message) => {
                 }
                 const amount = parseInt(args[0]);
                 if (isNaN(amount) || amount < 1 || amount > 100) {
-                    return message.channel.send("❌ Masukkan jumlah pesan dari 1 sampai 100! Contoh: `!pai clear 10`");
+                    return message.channel.send("❌ Masukkan jumlah pesan dari 1 sampai 100!");
                 }
                 await message.channel.bulkDelete(amount, true).catch(() => {});
                 const msg = await message.channel.send(`🧹 Berhasil menghapus **${amount}** pesan.`);
@@ -626,7 +703,7 @@ client.on('messageCreate', async (message) => {
             }
         }
 
-        // --- 🎯 AUTOMATIC REMINDERS ---
+        // --- 🎯 AUTOMATIC REMINDERS (TIDAK DIUBAH SAMA SEKALI) ---
         const handleTimer = (type, timeMs, textMsg, modeKey, gifUrl) => {
             const timerKey = `${userId}_${type}_${message.channel.id}`;
             if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
@@ -652,37 +729,32 @@ client.on('messageCreate', async (message) => {
             activeTimers.set(timerKey, timer);
         };
 
-        // 1. OWO / UWU (15 Detik)
         if ((msgLower === 'owo' || msgLower === 'uwu') && userCfg.owoEnabled) {
             handleTimer('owo', 15000, serverCfg.owoMsg, 'owoMode', userCfg.owoGif);
             return;
         }
 
-        // 2. HUNT BIASA (15 Detik)
         const isHunt = ['wh', 'owo hunt', 'owo h'].includes(msgLower) || msgLower.startsWith('wh ') || msgLower.startsWith('owo h ');
         if (isHunt && userCfg.huntEnabled) {
             handleTimer('hunt', 15000, serverCfg.huntMsg, 'huntMode', userCfg.huntGif);
             return;
         }
 
-        // 3. GOD HUNT (15 Detik)
         const isGod = ['gh', 'owo gh'].includes(msgLower) || msgLower.startsWith('gh ') || msgLower.startsWith('owo gh ');
         if (isGod && userCfg.godEnabled) {
             handleTimer('god', 15000, serverCfg.godMsg, 'godMode', userCfg.godGif);
             return;
         }
 
-        // 4. PRAY / CURSE (5 Menit)
         const isPray = msgLower.includes('wpray') || msgLower.includes('owo pray') || msgLower === 'wp' || msgLower === 'pr';
         if (isPray && userCfg.prayEnabled) {
             handleTimer('pray', 300000, serverCfg.prayMsg, 'prayMode', userCfg.prayGif);
             return;
         }
 
-        // 5. 🗳️ VOTE REMINDER (12 Jam / 43200000 ms)
         const isVote = ['owo vote', 'w vote', 'vote'].includes(msgLower) || msgLower.startsWith('ov') || msgLower.startsWith('wv');
         if (isVote && userCfg.voteEnabled) {
-            const voteTimeMs = 12 * 60 * 60 * 1000; // 12 Jam
+            const voteTimeMs = 12 * 60 * 60 * 1000;
             handleTimer('vote', voteTimeMs, serverCfg.voteMsg, 'voteMode', userCfg.voteGif);
             message.channel.send(`✅ <@${userId}> Pengingat vote 12 jam berhasil dipasang! 🗳️`).catch(() => {});
             return;
