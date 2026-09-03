@@ -13,12 +13,11 @@ const client = new Client({
 const gradientColors = ['#9B59B6', '#8A2BE2', '#C71585', '#4B0082', '#7B68EE', '#DDA0DD'];
 const getRandomColor = () => gradientColors[Math.floor(Math.random() * gradientColors.length)];
 
-// 📦 Settings Maps & RPG Data (With Zoo / Companion System & Letter Badges)
+// 📦 Settings Maps & RPG Data
 const serverSettings = new Map();
 const userSettings = new Map();
 const activeTimers = new Map();
 const rpgPlayers = new Map(); 
-// { userId: { hp, maxHp, atk, def, floor, inventory: [], equipped: {}, party: [], roster: [] } }
 
 function getServerConfig(guildId) {
     if (!serverSettings.has(guildId)) {
@@ -63,7 +62,8 @@ function getUserConfig(userId) {
 
 function getRpgPlayer(userId, username = "Hero") {
     if (!rpgPlayers.has(userId)) {
-        const starterHero = { name: username, class: 'Leader', tier: 'Common', tierBadge: '[C]', atkBonus: 0, defBonus: 0 };
+        // Karakter utama lu diset [L] Legendary otomatis!
+        const mainHero = { name: `${username} (Leader)`, class: 'Legendary Hero', tier: 'Legendary', tierBadge: '[L]', atkBonus: 25, defBonus: 15 };
         rpgPlayers.set(userId, {
             name: username,
             hp: 100,
@@ -73,8 +73,8 @@ function getRpgPlayer(userId, username = "Hero") {
             floor: 1,
             inventory: [],
             equipped: { weapon: null, armor: null, helmet: null },
-            party: [starterHero], // Max 3 active party members
-            roster: [starterHero] // Koleksi semua companion yang pernah ditemui (Mirip OwO Zoo)
+            party: [mainHero], 
+            roster: [mainHero] 
         });
     }
     return rpgPlayers.get(userId);
@@ -88,17 +88,18 @@ client.on('ready', () => {
 function createHelpEmbed(guildName, avatarURL, prefix) {
     return new EmbedBuilder()
         .setColor(getRandomColor())
-        .setAuthor({ name: '🏓 Reminders & Utility Menu', iconURL: client.user.displayAvatarURL() })
+        .setAuthor({ name: '🏓 Reminders & Dungeon RPG Menu', iconURL: client.user.displayAvatarURL() })
         .setDescription(
             `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
-            `**🎮 GAME REMINDERS**\n` +
-            `\`${prefix} owo\` | \`${prefix} owoh\` | \`${prefix} godh\` | \`${prefix} owopray\` | \`${prefix} owovote\`\n\n` +
+            `**🎮 GAME REMINDERS & AUTOHUNT (WHB/GHB)**\n` +
+            `\`${prefix} owo\` | \`${prefix} owoh\` | \`${prefix} godh\` | \`${prefix} owopray\` | \`${prefix} owovote\`\n` +
+            `*(Ketik \`whb 1\` atau \`ghb 1\` untuk baca timer auto hunt OwO otomatis via DM)*\n\n` +
             `**⚔️ DUNGEON RPG & COMPANION ZOO**\n` +
             `\`${prefix} dungeon\` (atau \`${prefix} dg\`) : Masuk dungeon, lawan monster, & cari companion\n` +
-            `\`${prefix} inv\` : Cek status total, gear, & inventory (dengan Badge Tier [L]/[E]/[R]/[U]/[C])\n` +
-            `\`${prefix} equip <no>\` (atau \`${prefix} use\`) : Pakai item dari inventory\n` +
+            `\`${prefix} inv\` : Cek status total, gear, & inventory ([L]/[E]/[R]/[U]/[C])\n` +
+            `\`${prefix} equip <no>\` : Pakai item dari inventory\n` +
             `\`${prefix} party\` : Kelola tim aktif (Maksimal 3 orang)\n` +
-            `\`${prefix} zoo\` (atau \`${prefix} roster\`) : Koleksi companion/orang yang ditemui di dungeon\n\n` +
+            `\`${prefix} zoo\` : Koleksi companion yang ditemui di dungeon\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` | \`${prefix} clear\` | \`${prefix} user\` | \`${prefix} uptime\` | \`${prefix} server\` | \`${prefix} avatar\``
         )
@@ -150,6 +151,7 @@ function createSettingsEmbed(user, type) {
 function createSettingsButtons(user, type) {
     const config = getUserConfig(user.id);
     const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
+    const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
     const isEnabled = config[keyMap[type]];
 
     return [
@@ -159,7 +161,7 @@ function createSettingsButtons(user, type) {
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`toggle_reply_${type}_${user.id}`).setLabel('reply').setEmoji('↩️').setStyle(config.replyEnabled ? ButtonStyle.Success : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`toggle_mode_${type}_${user.id}`).setLabel(`mode: ${config[type === 'owoh' ? 'huntMode' : 'owoMode']}`).setEmoji('🖼️').setStyle(ButtonStyle.Primary)
+            new ButtonBuilder().setCustomId(`toggle_mode_${type}_${user.id}`).setLabel(`mode: ${config[modeMap[type]]}`).setEmoji('🖼️').setStyle(ButtonStyle.Primary)
         )
     ];
 }
@@ -176,7 +178,86 @@ client.on('messageCreate', async (message) => {
         const serverCfg = getServerConfig(guildId);
         const userCfg = getUserConfig(userId);
 
-        if (message.author.bot) return;
+        // --- 🤖 DETEKSI PESAN DARI BOT (OwO Bot / God Bot) ---
+        if (message.author.bot) {
+            
+            // 1. Deteksi Captcha / Verification
+            if (msgLower.includes("captcha") || msgLower.includes("verify")) {
+                message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`).catch(() => {});
+            }
+
+            // 2. DETEKSI AUTOHUNT BOT (I WILL BE BACK IN)
+            if (msgUpper.includes('I WILL BE BACK IN')) {
+                const hoursMatch = msgUpper.match(/(\d+)\s*H/i);
+                const minutesMatch = msgUpper.match(/(\d+)\s*M/i);
+                const secondsMatch = msgUpper.match(/(\d+)\s*S/i);
+
+                let totalMs = 0;
+                let durationParts = [];
+
+                if (hoursMatch) {
+                    const h = parseInt(hoursMatch[1]);
+                    totalMs += h * 3600000;
+                    durationParts.push(`${h} Jam`);
+                }
+                if (minutesMatch) {
+                    const m = parseInt(minutesMatch[1]);
+                    totalMs += m * 60000;
+                    durationParts.push(`${m} Menit`);
+                }
+                if (secondsMatch) {
+                    const s = parseInt(secondsMatch[1]);
+                    totalMs += s * 1000;
+                    durationParts.push(`${s} Detik`);
+                }
+
+                const durationString = durationParts.join(' ') || 'beberapa saat';
+
+                let targetUser = message.mentions.users.first();
+                let huntTypeLabel = "OWO HUNTBOT";
+
+                // A. Cek dari reply pesan
+                if (!targetUser && message.reference) {
+                    const refMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+                    if (refMsg && !refMsg.author.bot) {
+                        targetUser = refMsg.author;
+                        if (refMsg.content.toLowerCase().includes('ghb') || refMsg.content.toLowerCase().includes('gah')) huntTypeLabel = "GOD HUNTBOT";
+                    }
+                }
+
+                // B. Cari pesan user paling akhir sebelum respon OwO bot ini
+                if (!targetUser) {
+                    const recentMsgs = await message.channel.messages.fetch({ limit: 6 }).catch(() => null);
+                    if (recentMsgs) {
+                        const huntKeywords = ['hb', 'ghb', 'whb', 'ah', 'w ah', 'autohunt', 'gah'];
+                        const lastUserMsg = recentMsgs.find(m => !m.author.bot && huntKeywords.some(kw => m.content.toLowerCase().includes(kw)));
+                        
+                        if (lastUserMsg) {
+                            targetUser = lastUserMsg.author;
+                            if (lastUserMsg.content.toLowerCase().includes('ghb') || lastUserMsg.content.toLowerCase().includes('gah')) {
+                                huntTypeLabel = "GOD HUNTBOT";
+                            }
+                        }
+                    }
+                }
+
+                if (totalMs > 0 && targetUser) {
+                    message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\``).catch(() => {});
+                    
+                    setTimeout(async () => {
+                        try {
+                            await targetUser.send({
+                                content: `🔔 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** Waktunya cek / hunt lagi! ⚔️`,
+                                allowedMentions: { users: [targetUser.id] }
+                            });
+                        } catch (e) {
+                            message.channel.send(`🚨 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** (DM kamu tertutup)`).catch(() => {});
+                        }
+                    }, totalMs);
+                }
+            }
+            return;
+        }
 
         // --- 🛠️ COMMAND HANDLER ---
         let usedPrefix = null;
@@ -195,6 +276,7 @@ client.on('messageCreate', async (message) => {
             }
             if (command === 'settings') return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
+            // --- ⚙️ SERVER SETTINGS ---
             if (command === 's' || command === 'set') {
                 const subCmd = args.shift()?.toLowerCase();
                 const newMsg = args.join(" ");
@@ -224,7 +306,7 @@ client.on('messageCreate', async (message) => {
             if (command === 'gif') {
                 const kategori = args[0]?.toLowerCase();
                 const linkGif = args[1];
-                if (!kategori || !linkGif) return message.channel.send(`❌ Format: \`${usedPrefix} gif godh <link_gif>\getKey>\``);
+                if (!kategori || !linkGif) return message.channel.send(`❌ Format: \`${usedPrefix} gif godh <link_gif>\``);
                 if (kategori === 'owo') userCfg.owoGif = linkGif;
                 else if (kategori === 'hunt' || kategori === 'owoh') userCfg.huntGif = linkGif;
                 else if (kategori === 'godh' || kategori === 'god' || kategori === 'gh') userCfg.godGif = linkGif;
@@ -262,7 +344,6 @@ client.on('messageCreate', async (message) => {
                     const enemyPower = enemyHp + (enemyAtk * 2);
 
                     if (playerPower >= enemyPower || Math.random() > 0.25) {
-                        // Roll Item Drop & Rarity (L, E, R, U, C)
                         const roll = Math.random() * 100;
                         let rarity = 'Common';
                         let badge = '[C]';
@@ -303,7 +384,6 @@ client.on('messageCreate', async (message) => {
                         };
                         player.inventory.push(newItem);
 
-                        // 35% Kemungkinan Nemu Orang/Companion di Dungeon
                         let companionText = "";
                         if (Math.random() <= 0.35) {
                             const compNames = ['Aria the Rogue', 'Gideon the Knight', 'Lyra the Mage', 'Kaelen the Archer', 'Vespera the Priest', 'Thorin the Berserker'];
@@ -355,7 +435,7 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🎒 INVENTORY DISPLAY (DENGAN BADGE TIER) ---
+            // --- 🎒 INVENTORY DISPLAY ---
             if (command === 'inv' || command === 'inventory') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
@@ -405,7 +485,7 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send(`✅ Berhasil memakai **${item.name}**! Status total karaktermu meningkat.`);
             }
 
-            // --- 🐾 COMPANION ZOO (KOLEKSI ORANG / ANGGOTA TIM) ---
+            // --- 🐾 COMPANION ZOO ---
             if (command === 'zoo' || command === 'roster') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
@@ -554,10 +634,17 @@ client.on('messageCreate', async (message) => {
             const timer = setTimeout(() => {
                 const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
                 const payload = { content: `${mentionStr} ${textMsg}` };
+                
                 if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
+                
                 if (userCfg[modeKey] === 'gif') {
-                    payload.embeds = [new EmbedBuilder().setColor(getRandomColor()).setImage(gifUrl)];
+                    payload.embeds = [
+                        new EmbedBuilder()
+                            .setColor(getRandomColor())
+                            .setImage(gifUrl)
+                    ];
                 }
+
                 message.channel.send(payload).catch(() => {});
                 activeTimers.delete(timerKey);
             }, timeMs);
@@ -565,32 +652,37 @@ client.on('messageCreate', async (message) => {
             activeTimers.set(timerKey, timer);
         };
 
+        // 1. OWO / UWU (15 Detik)
         if ((msgLower === 'owo' || msgLower === 'uwu') && userCfg.owoEnabled) {
             handleTimer('owo', 15000, serverCfg.owoMsg, 'owoMode', userCfg.owoGif);
             return;
         }
 
+        // 2. HUNT BIASA (15 Detik)
         const isHunt = ['wh', 'owo hunt', 'owo h'].includes(msgLower) || msgLower.startsWith('wh ') || msgLower.startsWith('owo h ');
         if (isHunt && userCfg.huntEnabled) {
             handleTimer('hunt', 15000, serverCfg.huntMsg, 'huntMode', userCfg.huntGif);
             return;
         }
 
+        // 3. GOD HUNT (15 Detik)
         const isGod = ['gh', 'owo gh'].includes(msgLower) || msgLower.startsWith('gh ') || msgLower.startsWith('owo gh ');
         if (isGod && userCfg.godEnabled) {
             handleTimer('god', 15000, serverCfg.godMsg, 'godMode', userCfg.godGif);
             return;
         }
 
+        // 4. PRAY / CURSE (5 Menit)
         const isPray = msgLower.includes('wpray') || msgLower.includes('owo pray') || msgLower === 'wp' || msgLower === 'pr';
         if (isPray && userCfg.prayEnabled) {
             handleTimer('pray', 300000, serverCfg.prayMsg, 'prayMode', userCfg.prayGif);
             return;
         }
 
+        // 5. 🗳️ VOTE REMINDER (12 Jam / 43200000 ms)
         const isVote = ['owo vote', 'w vote', 'vote'].includes(msgLower) || msgLower.startsWith('ov') || msgLower.startsWith('wv');
         if (isVote && userCfg.voteEnabled) {
-            const voteTimeMs = 12 * 60 * 60 * 1000;
+            const voteTimeMs = 12 * 60 * 60 * 1000; // 12 Jam
             handleTimer('vote', voteTimeMs, serverCfg.voteMsg, 'voteMode', userCfg.voteGif);
             message.channel.send(`✅ <@${userId}> Pengingat vote 12 jam berhasil dipasang! 🗳️`).catch(() => {});
             return;
