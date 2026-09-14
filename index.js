@@ -88,16 +88,18 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
         .setAuthor({ name: '🏓 Reminders, Casino & Utility Menu', iconURL: client.user.displayAvatarURL() })
         .setDescription(
             `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
+            `⚙️ **Ubah Prefix Bot:** \`${prefix} s prefix <baru>\`\n\n` +
             `**👑 OWNER COMMANDS**\n` +
-            `\`${prefix} addcash [jumlah] [@user]\` : Tambah saldo koin (Khusus Owner)\n\n` +
+            `\`${prefix} addcash [jumlah] [@user]\` : Tambah koin\n` +
+            `\`${prefix} removecash [jumlah] [@user]\` : Kurangi / reset koin\n\n` +
             `**🎮 GAME REMINDERS & TIMER CHECK**\n` +
             `\`${prefix} owo\` | \`${prefix} owoh\` | \`${prefix} godh\`\n` +
             `\`${prefix} whb 1\` : Cek sisa waktu huntbot aktif\n` +
             `\`${prefix} ghb 1\` : Cek sisa waktu god huntbot aktif\n\n` +
             `**🎰 CASINO MINIGAMES (Max Bet: 250.000)**\n` +
             `\`${prefix} cf [jumlah/all] [h/t]\` : Coinflip (OwO Style)\n` +
-            `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine (OwO Style)\n` +
-            `\`${prefix} bal\` : Cek saldo koin\n\n` +
+            `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine\n` +
+            `\`${prefix} cash\` atau \`${prefix} bal\` : Cek saldo koin\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\` | \`${prefix} user\` | \`${prefix} server\` | \`${prefix} avatar\``
         )
@@ -195,7 +197,14 @@ client.on('messageCreate', async (message) => {
 
                 const durationString = durationParts.join(' ') || 'beberapa saat';
                 const finishTimestamp = Date.now() + totalMs;
-                const timeStringFormatted = new Date(finishTimestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: true });
+                
+                // Format jam 24 jam (misal: 22:00 atau 01:00 tanpa AM/PM)
+                const finishDate = new Date(finishTimestamp);
+                const timeStringFormatted = finishDate.toLocaleTimeString('id-ID', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    hour12: false 
+                });
 
                 let targetUser = message.mentions.users.first();
                 let huntTypeLabel = "OWO HUNTBOT";
@@ -268,7 +277,11 @@ client.on('messageCreate', async (message) => {
                     const remMin = Math.floor(remSec / 60);
                     const remHour = Math.floor(remMin / 60);
                     const displayTime = remHour > 0 ? `${remHour}j ${remMin % 60}m` : `${remMin}m ${remSec % 60}d`;
-                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi.`);
+                    
+                    const finishDate = new Date(targetTime);
+                    const finishTimeFormatted = finishDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi (Selesai pukul ${finishTimeFormatted}).`);
                 }
             }
             return message.channel.send(`❓ Tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
@@ -290,7 +303,7 @@ client.on('messageCreate', async (message) => {
             }
             if (command === 'settings') return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
-            // --- 👑 OWNER COMMAND: ADD CASH (!addcash) - TANPA LABEL OWNER ---
+            // --- 👑 OWNER COMMAND: ADD CASH (!addcash) ---
             if (command === 'addcash' || command === 'give' || command === 'addmoney') {
                 if (!OWNER_IDS.includes(userId)) {
                     return message.channel.send(`❌ Perintah ini khusus untuk **Owner Bot**!`);
@@ -308,6 +321,31 @@ client.on('messageCreate', async (message) => {
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
 
                 return message.channel.send(`Berhasil menambahkan ${currencyEmoji} **${amountToAdd.toLocaleString('id-ID')}** koin ke akun <@${targetUser.id}>!\n🪙 Saldo sekarang: ${currencyEmoji} **${targetPlayer.balance.toLocaleString('id-ID')}**`);
+            }
+
+            // --- 👑 OWNER COMMAND: REMOVECASH / SUBCASH (Kurangi atau Reset Cash) ---
+            if (command === 'removecash' || command === 'subcash' || command === 'delcash') {
+                if (!OWNER_IDS.includes(userId)) {
+                    return message.channel.send(`❌ Perintah ini khusus untuk **Owner Bot**!`);
+                }
+
+                const targetUser = message.mentions.users.first() || message.author;
+                const targetPlayer = getRpgPlayer(targetUser.id, targetUser.username);
+                const currencyEmoji = '<:cowoncy:1549122224252784691>';
+
+                // Jika argumen kedua adalah 'reset' atau 'all', buat saldo jadi 0
+                if (args[0]?.toLowerCase() === 'reset' || args[0]?.toLowerCase() === 'all' || args[1]?.toLowerCase() === 'reset') {
+                    targetPlayer.balance = 0;
+                    return message.channel.send(`🧹 Berhasil mereset saldo koin <@${targetUser.id}> menjadi **0**!`);
+                }
+
+                const amountToSub = parseInt(args[0]) || parseInt(args[1]);
+                if (isNaN(amountToSub)) {
+                    return message.channel.send(`❌ Masukkan jumlah koin yang ingin dikurangi atau ketik \`reset\`! Contoh: \`${usedPrefix} removecash 50000\` atau \`${usedPrefix} removecash reset\``);
+                }
+
+                targetPlayer.balance = Math.max(0, targetPlayer.balance - amountToSub);
+                return message.channel.send(`Berhasil mengurangi ${currencyEmoji} **${amountToSub.toLocaleString('id-ID')}** koin dari <@${targetUser.id}>!\n🪙 Sisa saldo: ${currencyEmoji} **${targetPlayer.balance.toLocaleString('id-ID')}**`);
             }
 
             // --- 🪙 MINIGAME: COINFLIP (!cf) OWO STYLE ---
@@ -371,7 +409,7 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) DENGAN GARIS & URUTAN KIRI, KANAN, TENGAH ---
+            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) ---
             if (command === 'slot' || command === 'slots' || command === 's' || command === 'ws') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
@@ -405,7 +443,6 @@ client.on('messageCreate', async (message) => {
                 const allItems = [slots1, slots2, slots3, slots4, slots5, slots6];
                 const getRandomSlot = () => allItems[Math.floor(Math.random() * allItems.length)];
 
-                // Pesan awal dengan format garis OwO asli
                 const sentMsg = await message.channel.send(
                     `___SLOTS___\n` +
                     `${animatedSlot}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
@@ -413,7 +450,6 @@ client.on('messageCreate', async (message) => {
                     `|                      |`
                 );
 
-                // Tentukan hasil akhir di awal
                 const randChance = Math.random() * 100;
                 let r1, r2, r3;
                 let multiplier = 0;
@@ -459,7 +495,6 @@ client.on('messageCreate', async (message) => {
                     resultText = `and won nothing... :c`;
                 }
 
-                // --- ANIMASI SLOT BERTAHAP (Urutan: Kiri -> Kanan -> Tengah) ---
                 setTimeout(async () => {
                     await sentMsg.edit(
                         `___SLOTS___\n` +
@@ -490,8 +525,8 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🪙 CEK SALDO (!bal) - FORMAT OWO STYLE ---
-            if (command === 'bal' || command === 'balance') {
+            // --- 🪙 CEK SALDO (!cash / !bal) ---
+            if (command === 'cash' || command === 'bal' || command === 'balance') {
                 const player = getRpgPlayer(userId, message.author.username);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
                 return message.channel.send(`${currencyEmoji} | **${message.author.username}**, you currently have **${player.balance.toLocaleString('id-ID')}** cowoncy!`);
