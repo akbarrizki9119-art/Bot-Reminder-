@@ -98,7 +98,7 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
             `\`${prefix} ghb 1\` : Cek sisa waktu god huntbot aktif\n\n` +
             `**🎰 CASINO MINIGAMES (Max Bet: 250.000)**\n` +
             `\`${prefix} cf [jumlah/all] [h/t]\` : Coinflip (OwO Style)\n` +
-            `\`${prefix} slot\` / \`${prefix} slots\` / \`${prefix} ws\` [jumlah/all] : Slot Machine\n` +
+            `\`${prefix} s\` / \`${prefix} slot\` / \`${prefix} slots\` / \`${prefix} ws\` [jumlah/all] : Slot Machine\n` +
             `\`${prefix} cash\` atau \`${prefix} bal\` : Cek saldo koin\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\` | \`${prefix} user\` | \`${prefix} server\` | \`${prefix} avatar\``
@@ -224,7 +224,6 @@ client.on('messageCreate', async (message) => {
                 if (totalMs > 0 && targetUser) {
                     const sessionKey = `${targetUser.id}_${huntTypeLabel}`;
 
-                    // Clear timer & reset notifikasi sebelumnya agar tidak dobel/spam
                     if (activeTimers.has(sessionKey)) {
                         clearTimeout(activeTimers.get(sessionKey));
                     }
@@ -278,10 +277,13 @@ client.on('messageCreate', async (message) => {
             return message.channel.send(`❓ Tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
         }
 
+        // --- DETEKSI PREFIX OTOMATIS (Mendukung prefix custom user & !pai) ---
         let usedPrefix = null;
+        const currentPrefix = serverCfg.botPrefix ? serverCfg.botPrefix.toLowerCase() : "!";
+        
         if (msgLower.startsWith('!pai')) {
             usedPrefix = '!pai';
-        } else if (serverCfg.botPrefix && msgLower.startsWith(serverCfg.botPrefix.toLowerCase())) {
+        } else if (msgLower.startsWith(currentPrefix)) {
             usedPrefix = serverCfg.botPrefix;
         }
 
@@ -399,8 +401,8 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !slots / !ws) ---
-            if (command === 'slot' || command === 'slots' || command === 'ws') {
+            // --- 🎰 MINIGAME: SLOT MACHINE (!s / !slot / !slots / !ws) ---
+            if (command === 's' || command === 'slot' || command === 'slots' || command === 'ws') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
                 let betAmount = 100;
@@ -426,15 +428,15 @@ client.on('messageCreate', async (message) => {
                 const slots2 = '<:slots2:1549105269299089458>';
                 const slots3 = '<:slots3:1549105305797918751>';
                 const slots4 = '<:slots4:1549105355605287022>';
-                const slots5 = '<:slots5:1549105397384609844>'; // Ini emoji 'w'
+                const slots5 = '<:slots5:1549105397384609844>'; // Emoji 'w'
                 const slots6 = '<:slots6:1549105439017541642>';
                 const animatedSlot = '<a:slots:1549103089984999585>';
 
-                // List item untuk KIRI & KANAN (TANPA slots5/w)
+                // Kiri & Kanan: TANPA slots5/w
                 const outerItems = [slots1, slots2, slots3, slots4, slots6];
                 const getRandomOuter = () => outerItems[Math.floor(Math.random() * outerItems.length)];
 
-                // List item untuk TENGAH (DENGAN slots5/w)
+                // Tengah: Boleh ada slots5/w secara acak
                 const middleItems = [slots1, slots2, slots3, slots4, slots5, slots6];
                 const getRandomMiddle = () => middleItems[Math.floor(Math.random() * middleItems.length)];
 
@@ -475,7 +477,7 @@ client.on('messageCreate', async (message) => {
                     resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
                 } else {
                     r1 = getRandomOuter();
-                    r2 = getRandomMiddle(); // Kolom tengah boleh dapat slots5/w secara acak
+                    r2 = getRandomMiddle(); 
                     r3 = getRandomOuter();
                     if (r1 === r2 && r2 === r3) {
                         r3 = outerItems[(outerItems.indexOf(r1) + 1) % outerItems.length];
