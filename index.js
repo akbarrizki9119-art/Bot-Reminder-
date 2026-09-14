@@ -23,7 +23,7 @@ const rpgPlayers = new Map();
 const notifiedSessions = new Map();
 
 // 👑 MASUKKAN DISCORD USER ID LU DI SINI SUPAYA JADI OWNER UTAMA BOT!
-const OWNER_IDS = ['MASUKKAN_ID_DISCORD_LU_DISINI']; 
+const OWNER_IDS = ['1435043081316466720']; 
 
 function getServerConfig(guildId) {
     if (!serverSettings.has(guildId)) {
