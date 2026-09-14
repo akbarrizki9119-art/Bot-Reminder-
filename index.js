@@ -13,16 +13,14 @@ const client = new Client({
 const gradientColors = ['#9B59B6', '#8A2BE2', '#C71585', '#4B0082', '#7B68EE', '#DDA0DD'];
 const getRandomColor = () => gradientColors[Math.floor(Math.random() * gradientColors.length)];
 
-// 📦 Settings Maps & RPG Data
+// 📦 Settings Maps & RPG Database
 const serverSettings = new Map();
 const userSettings = new Map();
 const activeTimers = new Map();
+const notifiedSessions = new Map();
 const rpgPlayers = new Map(); 
 
-// Menyimpan status DM pengingat agar tidak spam
-const notifiedSessions = new Map();
-
-// 👑 MASUKKAN DISCORD USER ID LU DI SINI SUPAYA JADI OWNER UTAMA BOT!
+// 👑 MASUKKAN ID DISCORD LU DI SINI UNTUK AKSES OWNER (addcash/removecash)
 const OWNER_IDS = ['1435043081316466720']; 
 
 function getServerConfig(guildId) {
@@ -34,7 +32,7 @@ function getServerConfig(guildId) {
             huntMsg: "hunt 🎉",
             godMsg: "god hunt ⚡",
             prayMsg: "pray/curse 🙏",
-            voteMsg: "🗳️ Waktunya vote OwO bot! Yuk vote sekarang biar dapet reward!"
+            voteMsg: "🗳️ Waktunya vote OwO bot!"
         });
     }
     return serverSettings.get(guildId);
@@ -65,43 +63,37 @@ function getUserConfig(userId) {
     return userSettings.get(userId);
 }
 
-function getRpgPlayer(userId, username = "Hero") {
+function getRpgPlayer(userId, displayName = "Hero") {
     if (!rpgPlayers.has(userId)) {
         const initialBalance = OWNER_IDS.includes(userId) ? 100000000 : 1000;
-        rpgPlayers.set(userId, {
-            name: username,
-            balance: initialBalance, 
-            inventory: []
-        });
+        rpgPlayers.set(userId, { name: displayName, balance: initialBalance, inventory: [] });
     }
-    return rpgPlayers.get(userId);
+    const player = rpgPlayers.get(userId);
+    player.name = displayName; // Selalu update nickname terbaru
+    return player;
 }
 
 client.on('ready', () => {
     console.log(`✅ Bot ${client.user.tag} aktif & siap!`);
 });
 
-// --- 🎨 EMBED HELP & SETTINGS ---
 function createHelpEmbed(guildName, avatarURL, prefix) {
     return new EmbedBuilder()
         .setColor(getRandomColor())
         .setAuthor({ name: '🏓 Reminders, Casino & Utility Menu', iconURL: client.user.displayAvatarURL() })
         .setDescription(
-            `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
-            `⚙️ **Ubah Prefix Bot:** \`${prefix} s prefix <baru>\`\n\n` +
-            `**👑 OWNER COMMANDS**\n` +
-            `\`${prefix} addcash [jumlah] [@user]\` : Tambah koin\n` +
-            `\`${prefix} removecash [jumlah] [@user]\` : Kurangi / reset koin\n\n` +
+            `Gunakan \`${prefix}help\` untuk melihat bantuan.\n\n` +
+            `⚙️ **Ubah Prefix Bot:** \`${prefix}s prefix <baru>\`\n\n` +
             `**🎮 GAME REMINDERS & TIMER CHECK**\n` +
-            `\`${prefix} owo\` | \`${prefix} owoh\` | \`${prefix} godh\`\n` +
-            `\`${prefix} whb 1\` : Cek sisa waktu huntbot aktif\n` +
-            `\`${prefix} ghb 1\` : Cek sisa waktu god huntbot aktif\n\n` +
+            `\`${prefix}owo\` | \`${prefix}owoh\` | \`${prefix}godh\`\n` +
+            `\`${prefix}whb 1\` : Cek sisa waktu huntbot aktif\n` +
+            `\`${prefix}ghb 1\` : Cek sisa waktu god huntbot aktif\n\n` +
             `**🎰 CASINO MINIGAMES (Max Bet: 250.000)**\n` +
-            `\`${prefix} cf [jumlah/all] [h/t]\` : Coinflip (OwO Style)\n` +
-            `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine\n` +
-            `\`${prefix} cash\` atau \`${prefix} bal\` : Cek saldo koin\n\n` +
+            `\`${prefix}cf [jumlah/all] [h/t]\` : Coinflip (Tanpa Tag)\n` +
+            `\`${prefix}slot\` / \`${prefix}s\` / \`${prefix}ws\` [jumlah/all] : Slot Machine (Tanpa Tag)\n` +
+            `\`${prefix}cash\` atau \`${prefix}bal\` : Cek saldo koin\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
-            `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\` | \`${prefix} user\` | \`${prefix} server\` | \`${prefix} avatar\``
+            `\`${prefix}ping\` | \`${prefix}uptime\` | \`${prefix}clear <1-100>\` | \`${prefix}user\` | \`${prefix}server\` | \`${prefix}avatar\``
         )
         .setFooter({ text: `Server ${guildName || 'OPPAI'}`, iconURL: avatarURL || client.user.displayAvatarURL() });
 }
@@ -121,12 +113,10 @@ function createServerSettingsEmbed(guildId) {
         .setTitle('Server Settings')
         .setDescription(
             `⚙️ **OwO prefix:** \`${config.owoPrefix}\`\n` +
-            `🤖 **Bot prefix:** \`${config.botPrefix}\` (\`${config.botPrefix} s prefix <baru>\`)\n\n` +
-            `🌱 **owo:** \`${config.botPrefix} s owo <pesan>\`\n` +
-            `🏹 **hunt:** \`${config.botPrefix} s hunt <pesan>\`\n` +
-            `⚡ **god hunt:** \`${config.botPrefix} s godh <pesan>\`\n` +
-            `☘️ **pray/curse:** \`${config.botPrefix} s pray <pesan>\`\n` +
-            `🗳️ **vote:** \`${config.botPrefix} s vote <pesan>\``
+            `🤖 **Bot prefix:** \`${config.botPrefix}\` (\`${config.botPrefix}s prefix <baru>\`)\n\n` +
+            `🌱 **owo:** \`${config.botPrefix}s owo <pesan>\`\n` +
+            `🏹 **hunt:** \`${config.botPrefix}s hunt <pesan>\`\n` +
+            `⚡ **god hunt:** \`${config.botPrefix}s godh <pesan>\``
         );
 }
 
@@ -166,7 +156,6 @@ function createSettingsButtons(user, type) {
     ];
 }
 
-// --- 📩 MESSAGE EVENT HANDLER ---
 client.on('messageCreate', async (message) => {
     try {
         const content = message.content.trim();
@@ -178,11 +167,19 @@ client.on('messageCreate', async (message) => {
         const serverCfg = getServerConfig(guildId);
         const userCfg = getUserConfig(userId);
 
+        // Ambil display name (nickname server) atau fallback ke username
+        let userDisplayName = message.author.username;
+        if (message.guild) {
+            const member = await message.guild.members.fetch(userId).catch(() => null);
+            if (member) userDisplayName = member.displayName;
+        }
+
         if (message.author.bot) {
             if (msgLower.includes("captcha") || msgLower.includes("verify")) {
                 message.channel.send(`🚨 **PERINGATAN:** Ada Captcha/Verifikasi! Cek sekarang!`).catch(() => {});
             }
 
+            // --- KALKULASI AKURASI TIMER HUNTBOT (I WILL BE BACK IN) ---
             if (msgUpper.includes('I WILL BE BACK IN')) {
                 const hoursMatch = msgUpper.match(/(\d+)\s*H/i);
                 const minutesMatch = msgUpper.match(/(\d+)\s*M/i);
@@ -198,7 +195,6 @@ client.on('messageCreate', async (message) => {
                 const durationString = durationParts.join(' ') || 'beberapa saat';
                 const finishTimestamp = Date.now() + totalMs;
                 
-                // Format jam 24 jam (misal: 22:00 atau 01:00 tanpa AM/PM)
                 const finishDate = new Date(finishTimestamp);
                 const timeStringFormatted = finishDate.toLocaleTimeString('id-ID', { 
                     hour: '2-digit', 
@@ -207,12 +203,17 @@ client.on('messageCreate', async (message) => {
                 });
 
                 let targetUser = message.mentions.users.first();
+                let targetMemberName = userDisplayName;
                 let huntTypeLabel = "OWO HUNTBOT";
 
                 if (!targetUser && message.reference) {
                     const refMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
                     if (refMsg && !refMsg.author.bot) {
                         targetUser = refMsg.author;
+                        if (message.guild) {
+                            const mRef = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                            if (mRef) targetMemberName = mRef.displayName;
+                        }
                         if (refMsg.content.toLowerCase().includes('ghb') || refMsg.content.toLowerCase().includes('gah')) huntTypeLabel = "GOD HUNTBOT";
                     }
                 }
@@ -224,6 +225,10 @@ client.on('messageCreate', async (message) => {
                         const lastUserMsg = recentMsgs.find(m => !m.author.bot && huntKeywords.some(kw => m.content.toLowerCase().includes(kw)));
                         if (lastUserMsg) {
                             targetUser = lastUserMsg.author;
+                            if (message.guild) {
+                                const mRef = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                                if (mRef) targetMemberName = mRef.displayName;
+                            }
                             if (lastUserMsg.content.toLowerCase().includes('ghb') || lastUserMsg.content.toLowerCase().includes('gah')) huntTypeLabel = "GOD HUNTBOT";
                         }
                     }
@@ -239,20 +244,20 @@ client.on('messageCreate', async (message) => {
 
                     activeTimers.set(`${sessionKey}_target`, finishTimestamp);
 
-                    message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\` (Selesai pukul ${timeStringFormatted})`).catch(() => {});
+                    message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk **${targetMemberName}**!\n⏳ **Sisa waktu:** \`${durationString}\` (Selesai pukul ${timeStringFormatted})`).catch(() => {});
                     
                     const timer = setTimeout(async () => {
                         try {
                             const hasNotified = notifiedSessions.get(sessionKey);
                             if (!hasNotified) {
                                 await targetUser.send({
-                                    content: `🔔 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** Waktunya cek / hunt lagi! ⚔️`,
+                                    content: `🔔 **${targetMemberName}**, **${huntTypeLabel} SELESAI!** Waktunya cek / hunt lagi! ⚔️`,
                                     allowedMentions: { users: [targetUser.id] }
                                 });
                                 notifiedSessions.set(sessionKey, true);
                             }
                         } catch (e) {
-                            message.channel.send(`🚨 <@${targetUser.id}> **${huntTypeLabel} SELESAI!** (DM kamu tertutup)`).catch(() => {});
+                            message.channel.send(`🚨 **${targetMemberName}**, **${huntTypeLabel} SELESAI!** (DM kamu tertutup)`).catch(() => {});
                         }
                         activeTimers.delete(sessionKey);
                         activeTimers.delete(`${sessionKey}_target`);
@@ -265,8 +270,9 @@ client.on('messageCreate', async (message) => {
         }
 
         // --- COMMAND CEK TIMER MANUAL (whb 1 / ghb 1) ---
-        if (msgLower.startsWith('whb 1') || msgLower.startsWith('ghb 1')) {
-            const huntTypeLabel = msgLower.startsWith('ghb 1') ? "GOD HUNTBOT" : "OWO HUNTBOT";
+        if (msgLower === 'whb 1' || msgLower === 'ghb 1' || msgLower.startsWith('whb') || msgLower.startsWith('ghb')) {
+            const isGodHunt = msgLower.includes('ghb');
+            const huntTypeLabel = isGodHunt ? "GOD HUNTBOT" : "OWO HUNTBOT";
             const sessionKey = `${userId}_${huntTypeLabel}`;
             const targetTime = activeTimers.get(`${sessionKey}_target`);
 
@@ -276,22 +282,25 @@ client.on('messageCreate', async (message) => {
                     const remSec = Math.floor(remainingMs / 1000);
                     const remMin = Math.floor(remSec / 60);
                     const remHour = Math.floor(remMin / 60);
-                    const displayTime = remHour > 0 ? `${remHour}j ${remMin % 60}m` : `${remMin}m ${remSec % 60}d`;
+                    const displayTime = remHour > 0 ? `${remHour}j ${remMin % 60}m` : `${remMin}m`;
                     
                     const finishDate = new Date(targetTime);
                     const finishTimeFormatted = finishDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi (Selesai pukul ${finishTimeFormatted}).`);
+                    return message.channel.send(`⏳ **${userDisplayName}**, **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi (Selesai pukul ${finishTimeFormatted}).`);
                 }
             }
-            return message.channel.send(`❓ Tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
+            return message.channel.send(`❓ **${userDisplayName}**, tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
         }
 
+        // --- SISTEM PREFIX ---
         let usedPrefix = null;
-        if (msgLower.startsWith('!pai')) {
+        if (content.startsWith('!pai')) {
             usedPrefix = '!pai';
-        } else if (serverCfg.botPrefix && msgLower.startsWith(serverCfg.botPrefix.toLowerCase())) {
+        } else if (content.startsWith(serverCfg.botPrefix)) {
             usedPrefix = serverCfg.botPrefix;
+        } else if (content.startsWith('!')) {
+            usedPrefix = '!';
         }
 
         if (usedPrefix) {
@@ -303,94 +312,75 @@ client.on('messageCreate', async (message) => {
             }
             if (command === 'settings') return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
-            // --- 👑 OWNER COMMAND: ADD CASH (!addcash) ---
+            // --- 👑 OWNER COMMAND: ADD CASH ---
             if (command === 'addcash' || command === 'give' || command === 'addmoney') {
-                if (!OWNER_IDS.includes(userId)) {
-                    return message.channel.send(`❌ Perintah ini khusus untuk **Owner Bot**!`);
-                }
-
+                if (!OWNER_IDS.includes(userId)) return message.channel.send(`❌ Perintah khusus Owner Bot!`);
                 const targetUser = message.mentions.users.first() || message.author;
-                const amountToAdd = parseInt(args[0]) || parseInt(args[1]) || 100000000;
-
-                if (isNaN(amountToAdd)) {
-                    return message.channel.send(`❌ Masukkan jumlah nominal koin yang valid! Contoh: \`${usedPrefix} addcash 100000000\``);
+                let targetName = targetUser.username;
+                if (message.guild) {
+                    const tm = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                    if (tm) targetName = tm.displayName;
                 }
-
-                const targetPlayer = getRpgPlayer(targetUser.id, targetUser.username);
+                const amountToAdd = parseInt(args[0]) || parseInt(args[1]) || 100000000;
+                const targetPlayer = getRpgPlayer(targetUser.id, targetName);
                 targetPlayer.balance += amountToAdd;
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
-
-                return message.channel.send(`Berhasil menambahkan ${currencyEmoji} **${amountToAdd.toLocaleString('id-ID')}** koin ke akun <@${targetUser.id}>!\n🪙 Saldo sekarang: ${currencyEmoji} **${targetPlayer.balance.toLocaleString('id-ID')}**`);
+                return message.channel.send(`Berhasil menambahkan ${currencyEmoji} **${amountToAdd.toLocaleString('id-ID')}** koin ke **${targetName}**!\n🪙 Saldo: ${currencyEmoji} **${targetPlayer.balance.toLocaleString('id-ID')}**`);
             }
 
-            // --- 👑 OWNER COMMAND: REMOVECASH / SUBCASH (Kurangi atau Reset Cash) ---
+            // --- 👑 OWNER COMMAND: REMOVECASH / RESET ---
             if (command === 'removecash' || command === 'subcash' || command === 'delcash') {
-                if (!OWNER_IDS.includes(userId)) {
-                    return message.channel.send(`❌ Perintah ini khusus untuk **Owner Bot**!`);
-                }
-
+                if (!OWNER_IDS.includes(userId)) return message.channel.send(`❌ Perintah khusus Owner Bot!`);
                 const targetUser = message.mentions.users.first() || message.author;
-                const targetPlayer = getRpgPlayer(targetUser.id, targetUser.username);
+                let targetName = targetUser.username;
+                if (message.guild) {
+                    const tm = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                    if (tm) targetName = tm.displayName;
+                }
+                const targetPlayer = getRpgPlayer(targetUser.id, targetName);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
 
-                // Jika argumen kedua adalah 'reset' atau 'all', buat saldo jadi 0
                 if (args[0]?.toLowerCase() === 'reset' || args[0]?.toLowerCase() === 'all' || args[1]?.toLowerCase() === 'reset') {
                     targetPlayer.balance = 0;
-                    return message.channel.send(`🧹 Berhasil mereset saldo koin <@${targetUser.id}> menjadi **0**!`);
+                    return message.channel.send(`🧹 Saldo koin **${targetName}** berhasil direset menjadi **0**!`);
                 }
 
                 const amountToSub = parseInt(args[0]) || parseInt(args[1]);
-                if (isNaN(amountToSub)) {
-                    return message.channel.send(`❌ Masukkan jumlah koin yang ingin dikurangi atau ketik \`reset\`! Contoh: \`${usedPrefix} removecash 50000\` atau \`${usedPrefix} removecash reset\``);
-                }
+                if (isNaN(amountToSub)) return message.channel.send(`❌ Format salah! Contoh: \`${usedPrefix}removecash 50000\` atau \`${usedPrefix}removecash reset\``);
 
                 targetPlayer.balance = Math.max(0, targetPlayer.balance - amountToSub);
-                return message.channel.send(`Berhasil mengurangi ${currencyEmoji} **${amountToSub.toLocaleString('id-ID')}** koin dari <@${targetUser.id}>!\n🪙 Sisa saldo: ${currencyEmoji} **${targetPlayer.balance.toLocaleString('id-ID')}**`);
+                return message.channel.send(`Berhasil mengurangi ${currencyEmoji} **${amountToSub.toLocaleString('id-ID')}** dari **${targetName}**!\n🪙 Sisa: ${currencyEmoji} **${targetPlayer.balance.toLocaleString('id-ID')}**`);
             }
 
-            // --- 🪙 MINIGAME: COINFLIP (!cf) OWO STYLE ---
+            // --- 🪙 COINFLIP (TANPA TAG) ---
             if (command === 'cf' || command === 'coinflip') {
-                const player = getRpgPlayer(userId, message.author.username);
-                
-                let betAmount = 100; 
-                let choice = 'heads';
+                const player = getRpgPlayer(userId, userDisplayName);
+                let betAmount = 100, choice = 'heads';
                 const maxBet = 250000;
 
                 if (args.length > 0) {
                     const arg0 = args[0].toLowerCase();
                     if (arg0 === 'all') {
                         betAmount = Math.min(player.balance, maxBet);
-                        if (args[1]) {
-                            const cArg = args[1].toLowerCase();
-                            if (cArg === 't' || cArg === 'tails') choice = 'tails';
-                        }
+                        if (args[1] && ['t', 'tails'].includes(args[1].toLowerCase())) choice = 'tails';
                     } else if (!isNaN(args[0])) {
-                        betAmount = parseInt(args[0]);
-                        if (betAmount > maxBet) betAmount = maxBet;
-                        if (betAmount < 1) betAmount = 1;
-
-                        if (args[1]) {
-                            const cArg = args[1].toLowerCase();
-                            if (cArg === 't' || cArg === 'tails') choice = 'tails';
-                        }
-                    } else {
-                        if (arg0 === 't' || arg0 === 'tails') choice = 'tails';
+                        betAmount = Math.min(Math.max(parseInt(args[0]), 1), maxBet);
+                        if (args[1] && ['t', 'tails'].includes(args[1].toLowerCase())) choice = 'tails';
+                    } else if (['t', 'tails'].includes(arg0)) {
+                        choice = 'tails';
                     }
                 }
 
-                if (player.balance < betAmount) {
-                    return message.channel.send(`❌ Saldo koin kamu tidak cukup! Saldo kamu saat ini: \`${player.balance.toLocaleString('id-ID')}\``);
-                }
+                if (player.balance < betAmount) return message.channel.send(`❌ Saldo kurang! Saldo kamu: \`${player.balance.toLocaleString('id-ID')}\``);
 
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
                 const spinningEmoji = '<a:coinflip:1549103223825240074>';
                 const headsEmoji = '<:heads:1549103331459203154>';
                 const tailsEmoji = '<:tails:1549103379194847366>';
 
-                const sentMsg = await message.reply({
-                    content: `<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${spinningEmoji}`,
-                    allowedMentions: { users: [userId] }
-                });
+                const sentMsg = await message.channel.send(
+                    `**${userDisplayName}** spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${spinningEmoji}`
+                );
 
                 setTimeout(async () => {
                     const isWin = Math.random() < 0.5;
@@ -399,37 +389,28 @@ client.on('messageCreate', async (message) => {
 
                     if (isWin) {
                         player.balance += betAmount;
-                        const winAmount = betAmount * 2;
-                        await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you won ${currencyEmoji} **${winAmount.toLocaleString('id-ID')}**!!`);
+                        await sentMsg.edit(`**${userDisplayName}** spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you won ${currencyEmoji} **${(betAmount * 2).toLocaleString('id-ID')}**!!`);
                     } else {
                         player.balance -= betAmount;
-                        await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you lost it all... :c`);
+                        await sentMsg.edit(`**${userDisplayName}** spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you lost it all... :c`);
                     }
                 }, 1500);
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) ---
+            // --- 🎰 SLOT MACHINE (TANPA TAG & RAPI DI TENGAH) ---
             if (command === 'slot' || command === 'slots' || command === 's' || command === 'ws') {
-                const player = getRpgPlayer(userId, message.author.username);
-                
+                const player = getRpgPlayer(userId, userDisplayName);
                 let betAmount = 100;
                 const maxBet = 250000;
 
                 if (args.length > 0) {
                     const arg0 = args[0].toLowerCase();
-                    if (arg0 === 'all') {
-                        betAmount = Math.min(player.balance, maxBet);
-                    } else if (!isNaN(args[0])) {
-                        betAmount = parseInt(args[0]);
-                        if (betAmount > maxBet) betAmount = maxBet;
-                        if (betAmount < 1) betAmount = 1;
-                    }
+                    if (arg0 === 'all') betAmount = Math.min(player.balance, maxBet);
+                    else if (!isNaN(args[0])) betAmount = Math.min(Math.max(parseInt(args[0]), 1), maxBet);
                 }
 
-                if (player.balance < betAmount) {
-                    return message.channel.send(`❌ Saldo koin kamu kurang! Saldo kamu: \`${player.balance.toLocaleString('id-ID')}\``);
-                }
+                if (player.balance < betAmount) return message.channel.send(`❌ Saldo kamu kurang! Saldo: \`${player.balance.toLocaleString('id-ID')}\``);
 
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
                 const slots1 = '<:slots1:1549105223555883188>';
@@ -444,232 +425,123 @@ client.on('messageCreate', async (message) => {
                 const getRandomSlot = () => allItems[Math.floor(Math.random() * allItems.length)];
 
                 const sentMsg = await message.channel.send(
-                    `___SLOTS___\n` +
-                    `${animatedSlot}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
-                    `|                      |\n` +
-                    `|                      |`
+                    `┌────── **SLOTS** ──────┐\n` +
+                    `${animatedSlot}  ${animatedSlot}  ${animatedSlot}     **${userDisplayName}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                    `└─────────────────────┘`
                 );
 
                 const randChance = Math.random() * 100;
-                let r1, r2, r3;
-                let multiplier = 0;
-                let resultText = '';
+                let r1, r2, r3, resultText = '';
 
                 if (randChance < 1.0) {
-                    r1 = slots6; r2 = slots5; r3 = slots6; 
-                    multiplier = 10;
-                    const totalWon = betAmount * multiplier;
+                    r1 = slots6; r2 = slots5; r3 = slots6;
+                    const totalWon = betAmount * 10;
                     player.balance += (totalWon - betAmount);
-                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉 JACKPOT OWO!!`;
-                } else if (randChance < 4.0) {
+                    resultText = `🎉 JACKPOT! Won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**`;
+                } else if (randChance < 5.0) {
                     r1 = slots4; r2 = slots4; r3 = slots4;
-                    multiplier = 4;
-                    const totalWon = betAmount * multiplier;
+                    const totalWon = betAmount * 4;
                     player.balance += (totalWon - betAmount);
-                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
-                } else if (randChance < 10.0) {
-                    r1 = slots3; r2 = slots3; r3 = slots3;
-                    multiplier = 3;
-                    const totalWon = betAmount * multiplier;
-                    player.balance += (totalWon - betAmount);
-                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
-                } else if (randChance < 25.0) {
+                    resultText = `🎉 Won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**`;
+                } else if (randChance < 15.0) {
                     r1 = slots2; r2 = slots2; r3 = slots2;
-                    multiplier = 2;
-                    const totalWon = betAmount * multiplier;
+                    const totalWon = betAmount * 2;
                     player.balance += (totalWon - betAmount);
-                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
-                } else if (randChance < 45.0) {
-                    r1 = slots1; r2 = slots1; r3 = slots1;
-                    multiplier = 1;
-                    const totalWon = betAmount * multiplier; 
-                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
+                    resultText = `👍 Won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**`;
                 } else {
-                    r1 = getRandomSlot();
-                    r2 = getRandomSlot();
-                    r3 = getRandomSlot();
-                    if (r1 === r2 && r2 === r3) {
-                        r3 = allItems[(allItems.indexOf(r1) + 2) % allItems.length];
-                    }
+                    r1 = getRandomSlot(); r2 = getRandomSlot(); r3 = getRandomSlot();
+                    if (r1 === r2 && r2 === r3) r3 = allItems[(allItems.indexOf(r1) + 1) % allItems.length];
                     player.balance -= betAmount;
-                    resultText = `and won nothing... :c`;
+                    resultText = `and lost it all... :c`;
                 }
 
                 setTimeout(async () => {
                     await sentMsg.edit(
-                        `___SLOTS___\n` +
-                        `${r1}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
-                        `|                      |\n` +
-                        `|                      |`
+                        `┌────── **SLOTS** ──────┐\n` +
+                        `${r1}  ${animatedSlot}  ${animatedSlot}     **${userDisplayName}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `└─────────────────────┘`
                     ).catch(() => {});
                 }, 900);
 
                 setTimeout(async () => {
                     await sentMsg.edit(
-                        `___SLOTS___\n` +
-                        `${r1}  ${animatedSlot}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
-                        `|                      |\n` +
-                        `|                      |`
+                        `┌────── **SLOTS** ──────┐\n` +
+                        `${r1}  ${animatedSlot}  ${r3}     **${userDisplayName}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `└─────────────────────┘`
                     ).catch(() => {});
                 }, 1800);
 
                 setTimeout(async () => {
                     await sentMsg.edit(
-                        `___SLOTS___\n` +
-                        `${r1}  ${r2}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
-                        `|                      |     ${resultText}\n` +
-                        `|                      |`
+                        `┌────── **SLOTS** ──────┐\n` +
+                        `${r1}  ${r2}  ${r3}     **${userDisplayName}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `└──── ${resultText} ────┘`
                     ).catch(() => {});
                 }, 2700);
 
                 return;
             }
 
-            // --- 🪙 CEK SALDO (!cash / !bal) ---
+            // --- 🪙 SALDO (!cash / !bal) ---
             if (command === 'cash' || command === 'bal' || command === 'balance') {
-                const player = getRpgPlayer(userId, message.author.username);
+                const player = getRpgPlayer(userId, userDisplayName);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
-                return message.channel.send(`${currencyEmoji} | **${message.author.username}**, you currently have **${player.balance.toLocaleString('id-ID')}** cowoncy!`);
+                return message.channel.send(`${currencyEmoji} | **${userDisplayName}**, you currently have **${player.balance.toLocaleString('id-ID')}** cowoncy!`);
             }
 
-            // --- ⚙️ SERVER SETTINGS ---
+            // --- ⚙️ SETTINGS ---
             if (command === 's' || command === 'set') {
                 const subCmd = args.shift()?.toLowerCase();
                 const newMsg = args.join(" ");
 
                 if (subCmd === 'prefix') {
-                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} s prefix .\``);
+                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix}s prefix .\``);
                     serverCfg.botPrefix = args[0];
                     return message.channel.send(`✅ Bot prefix berhasil diubah menjadi \`${serverCfg.botPrefix}\``);
                 }
-                if (subCmd === 'owoprefix') {
-                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} s owoprefix w\``);
-                    serverCfg.owoPrefix = args[0];
-                    return message.channel.send(`✅ OwO prefix berhasil diubah menjadi \`${serverCfg.owoPrefix}\``);
-                }
-
                 if (subCmd === 'hunt') { serverCfg.huntMsg = newMsg; return message.channel.send(`✅ Updated **hunt** msg.`); }
-                if (subCmd === 'godh' || subCmd === 'god') { serverCfg.godMsg = newMsg; return message.channel.send(`✅ Updated **god hunt** msg.`); }
+                if (subCmd === 'godh') { serverCfg.godMsg = newMsg; return message.channel.send(`✅ Updated **god hunt** msg.`); }
                 if (subCmd === 'owo') { serverCfg.owoMsg = newMsg; return message.channel.send(`✅ Updated **owo** msg.`); }
-                if (subCmd === 'pray') { serverCfg.prayMsg = newMsg; return message.channel.send(`✅ Updated **pray** msg.`); }
-                if (subCmd === 'vote') { serverCfg.voteMsg = newMsg; return message.channel.send(`✅ Updated **vote** msg.`); }
             }
 
             if (['owoh', 'godh', 'owo', 'owopray', 'owovote'].includes(command)) {
                 return message.channel.send({ embeds: [createSettingsEmbed(message.author, command)], components: createSettingsButtons(message.author, command) });
             }
 
-            if (command === 'gif') {
-                const kategori = args[0]?.toLowerCase();
-                const linkGif = args[1];
-                if (!kategori || !linkGif) return message.channel.send(`❌ Format: \`${usedPrefix} gif godh <link_gif>\``);
-                if (kategori === 'owo') userCfg.owoGif = linkGif;
-                else if (kategori === 'hunt' || kategori === 'owoh') userCfg.huntGif = linkGif;
-                else if (kategori === 'godh' || kategori === 'god' || kategori === 'gh') userCfg.godGif = linkGif;
-                else if (kategori === 'pray' || kategori === 'owopray') userCfg.prayGif = linkGif;
-                else if (kategori === 'vote' || kategori === 'owovote') userCfg.voteGif = linkGif;
-                return message.channel.send(`✅ GIF **${kategori}** diperbarui!`);
-            }
-
-            // --- 🛠️ UTILITY COMMANDS HANDLER ---
+            // --- 🛠️ UTILITY COMMANDS ---
             if (command === 'ping') {
                 const sent = await message.channel.send("🏓 Measuring latency...");
-                const latency = sent.createdTimestamp - message.createdTimestamp;
-                const apiLatency = Math.round(client.ws.ping);
-                return sent.edit(`🏓 **Pong!**\n📡 **Latency Bot:** \`${latency}ms\`\n⚡ **API Latency:** \`${apiLatency}ms\``);
+                return sent.edit(`🏓 **Pong!** Bot: \`${sent.createdTimestamp - message.createdTimestamp}ms\` | API: \`${Math.round(client.ws.ping)}ms\``);
             }
 
             if (command === 'clear') {
-                if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-                    return message.channel.send("❌ Kamu tidak memiliki izin `Manage Messages`!");
-                }
+                if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.channel.send("❌ Tidak ada izin!");
                 const amount = parseInt(args[0]);
-                if (isNaN(amount) || amount < 1 || amount > 100) {
-                    return message.channel.send("❌ Masukkan jumlah pesan dari 1 sampai 100!");
-                }
+                if (isNaN(amount) || amount < 1 || amount > 100) return message.channel.send("❌ Masukkan angka 1-100!");
                 await message.channel.bulkDelete(amount, true).catch(() => {});
-                const msg = await message.channel.send(`🧹 Berhasil menghapus **${amount}** pesan.`);
+                const msg = await message.channel.send(`🧹 Menghapus **${amount}** pesan.`);
                 setTimeout(() => msg.delete().catch(() => {}), 3000);
                 return;
             }
 
-            if (command === 'user') {
-                const targetUser = message.mentions.users.first() || message.author;
-                const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
-                
-                const embed = new EmbedBuilder()
-                    .setColor(getRandomColor())
-                    .setAuthor({ name: `User Info - ${targetUser.username}`, iconURL: targetUser.displayAvatarURL() })
-                    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 512 }))
-                    .addFields(
-                        { name: '👤 Username', value: `${targetUser.tag}`, inline: true },
-                        { name: '🆔 User ID', value: `\`${targetUser.id}\``, inline: true },
-                        { name: '📅 Akun Dibuat', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: false }
-                    );
-
-                if (member) {
-                    embed.addFields({ name: '📥 Masuk Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true });
-                }
-
-                return message.channel.send({ embeds: [embed] });
-            }
-
             if (command === 'uptime') {
-                let totalSeconds = (client.uptime / 1000);
-                let days = Math.floor(totalSeconds / 86400);
-                totalSeconds %= 86400;
-                let hours = Math.floor(totalSeconds / 3600);
-                totalSeconds %= 3600;
-                let minutes = Math.floor(totalSeconds / 60);
-                let seconds = Math.floor(totalSeconds % 60);
-
-                return message.channel.send(`⏰ **Bot Uptime:** \`${days}d ${hours}h ${minutes}m ${seconds}s\``);
-            }
-
-            if (command === 'server') {
-                const guild = message.guild;
-                const embed = new EmbedBuilder()
-                    .setColor(getRandomColor())
-                    .setTitle(`Server Info - ${guild.name}`)
-                    .setThumbnail(guild.iconURL({ dynamic: true }))
-                    .addFields(
-                        { name: '👑 Owner', value: `<@${guild.ownerId}>`, inline: true },
-                        { name: '👥 Member Count', value: `\`${guild.memberCount}\` members`, inline: true },
-                        { name: '📅 Server Dibuat', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
-                    );
-                return message.channel.send({ embeds: [embed] });
-            }
-
-            if (command === 'avatar' || command === 'av') {
-                const targetUser = message.mentions.users.first() || message.author;
-                const avatarURL = targetUser.displayAvatarURL({ dynamic: true, size: 1024 });
-                const embed = new EmbedBuilder()
-                    .setColor(getRandomColor())
-                    .setTitle(`Avatar - ${targetUser.username}`)
-                    .setImage(avatarURL);
-                return message.channel.send({ embeds: [embed] });
+                let sec = Math.floor(client.uptime / 1000);
+                let d = Math.floor(sec / 86400); sec %= 86400;
+                let h = Math.floor(sec / 3600); sec %= 3600;
+                let m = Math.floor(sec / 60);
+                return message.channel.send(`⏰ **Uptime:** \`${d}d ${h}h ${m}m\``);
             }
         }
 
-        // --- 🎯 AUTOMATIC REMINDERS ---
+        // --- 🎯 AUTO REMINDERS ---
         const handleTimer = (type, timeMs, textMsg, modeKey, gifUrl) => {
             const timerKey = `${userId}_${type}_${message.channel.id}`;
             if (activeTimers.has(timerKey)) clearTimeout(activeTimers.get(timerKey));
 
             const timer = setTimeout(() => {
-                const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${message.author.username}**`;
+                const mentionStr = userCfg.pingsEnabled ? `<@${userId}>` : `**${userDisplayName}**`;
                 const payload = { content: `${mentionStr} ${textMsg}` };
-                
                 if (userCfg.replyEnabled) payload.reply = { messageReference: message.id };
-                
-                if (userCfg[modeKey] === 'gif') {
-                    payload.embeds = [
-                        new EmbedBuilder()
-                            .setColor(getRandomColor())
-                            .setImage(gifUrl)
-                    ];
-                }
-
                 message.channel.send(payload).catch(() => {});
                 activeTimers.delete(timerKey);
             }, timeMs);
@@ -677,88 +549,27 @@ client.on('messageCreate', async (message) => {
             activeTimers.set(timerKey, timer);
         };
 
-        if ((msgLower === 'owo' || msgLower === 'uwu') && userCfg.owoEnabled) {
-            handleTimer('owo', 15000, serverCfg.owoMsg, 'owoMode', userCfg.owoGif);
-            return;
-        }
-
-        const isHunt = ['wh', 'owo hunt', 'owo h'].includes(msgLower) || msgLower.startsWith('wh ') || msgLower.startsWith('owo h ');
-        if (isHunt && userCfg.huntEnabled) {
-            handleTimer('hunt', 15000, serverCfg.huntMsg, 'huntMode', userCfg.huntGif);
-            return;
-        }
-
-        const isGod = ['gh', 'owo gh'].includes(msgLower) || msgLower.startsWith('gh ') || msgLower.startsWith('owo gh ');
-        if (isGod && userCfg.godEnabled) {
-            handleTimer('god', 15000, serverCfg.godMsg, 'godMode', userCfg.godGif);
-            return;
-        }
-
-        const isPray = msgLower.includes('wpray') || msgLower.includes('owo pray') || msgLower === 'wp' || msgLower === 'pr';
-        if (isPray && userCfg.prayEnabled) {
-            handleTimer('pray', 300000, serverCfg.prayMsg, 'prayMode', userCfg.prayGif);
-            return;
-        }
-
-        const isVote = ['owo vote', 'w vote', 'vote'].includes(msgLower) || msgLower.startsWith('ov') || msgLower.startsWith('wv');
-        if (isVote && userCfg.voteEnabled) {
-            const voteTimeMs = 12 * 60 * 60 * 1000;
-            handleTimer('vote', voteTimeMs, serverCfg.voteMsg, 'voteMode', userCfg.voteGif);
-            message.channel.send(`✅ <@${userId}> Pengingat vote 12 jam berhasil dipasang! 🗳️`).catch(() => {});
-            return;
-        }
+        if ((msgLower === 'owo' || msgLower === 'uwu') && userCfg.owoEnabled) handleTimer('owo', 15000, serverCfg.owoMsg, 'owoMode', userCfg.owoGif);
+        if ((['wh', 'owo hunt'].includes(msgLower) || msgLower.startsWith('wh ')) && userCfg.huntEnabled) handleTimer('hunt', 15000, serverCfg.huntMsg, 'huntMode', userCfg.huntGif);
+        if ((['gh', 'owo gh'].includes(msgLower) || msgLower.startsWith('gh ')) && userCfg.godEnabled) handleTimer('god', 15000, serverCfg.godMsg, 'godMode', userCfg.godGif);
 
     } catch (err) {
         console.error("Message error:", err);
     }
 });
 
-// --- 🔘 BUTTON INTERACTION HANDLER ---
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
-        const parts = interaction.customId.split('_');
         const guildId = interaction.guild?.id || 'dm';
         const serverCfg = getServerConfig(guildId);
 
-        if (interaction.customId === 'help_reminders') {
-            return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
-        }
-        
+        if (interaction.customId === 'help_reminders') return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
         if (interaction.customId === 'help_utility') {
-            const embed = new EmbedBuilder()
-                .setColor(getRandomColor())
-                .setTitle('🛠️ Commands Utilitas')
-                .setDescription(
-                    `\`${serverCfg.botPrefix} ping\` : Cek delay respon bot\n` +
-                    `\`${serverCfg.botPrefix} clear <jumlah>\` : Hapus chat spam secara cepat\n` +
-                    `\`${serverCfg.botPrefix} user [@user]\` : Tampilkan detail info user\n` +
-                    `\`${serverCfg.botPrefix} uptime\` : Cek durasi bot menyala\n` +
-                    `\`${serverCfg.botPrefix} server\` : Informasi server Discord\n` +
-                    `\`${serverCfg.botPrefix} avatar [@user]\` : Ambil foto profil HD`
-                );
+            const embed = new EmbedBuilder().setColor(getRandomColor()).setTitle('🛠️ Utilitas').setDescription(`\`${serverCfg.botPrefix}ping\`\n\`${serverCfg.botPrefix}clear\`\n\`${serverCfg.botPrefix}uptime\``);
             return interaction.update({ embeds: [embed], components: [createHelpButtons()] });
         }
-
-        if (interaction.customId === 'help_settings') {
-            return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
-        }
-
-        if (parts[0] === 'toggle') {
-            const [, key, type, ownerId] = parts;
-            if (interaction.user.id !== ownerId) return interaction.reply({ content: '❌ Bukan settinganmu!', ephemeral: true });
-
-            const config = getUserConfig(ownerId);
-            const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
-            const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
-
-            if (key === 'enable') config[keyMap[type]] = !config[keyMap[type]];
-            if (key === 'ping') config.pingsEnabled = !config.pingsEnabled;
-            if (key === 'reply') config.replyEnabled = !config.replyEnabled;
-            if (key === 'mode') config[modeMap[type]] = config[modeMap[type]] === 'text' ? 'gif' : 'text';
-
-            return interaction.update({ embeds: [createSettingsEmbed(interaction.user, type)], components: createSettingsButtons(interaction.user, type) });
-        }
+        if (interaction.customId === 'help_settings') return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
     } catch (err) {
         console.error("Button error:", err);
     }
