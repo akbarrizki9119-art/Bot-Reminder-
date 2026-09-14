@@ -198,6 +198,7 @@ client.on('messageCreate', async (message) => {
                 const durationString = durationParts.join(' ') || 'beberapa saat';
                 const finishTimestamp = Date.now() + totalMs;
                 
+                // Format jam 24 jam (misal: 22:00 atau 01:00 tanpa AM/PM)
                 const finishDate = new Date(finishTimestamp);
                 const timeStringFormatted = finishDate.toLocaleTimeString('id-ID', { 
                     hour: '2-digit', 
@@ -263,10 +264,9 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
-        // --- COMMAND CEK TIMER MANUAL (whb / ghb / whb 1 / ghb 1) ---
-        if (msgLower === 'whb' || msgLower === 'ghb' || msgLower.startsWith('whb ') || msgLower.startsWith('ghb ') || msgLower === 'whb 1' || msgLower === 'ghb 1') {
-            const isGodHunt = msgLower.includes('ghb');
-            const huntTypeLabel = isGodHunt ? "GOD HUNTBOT" : "OWO HUNTBOT";
+        // --- COMMAND CEK TIMER MANUAL (whb 1 / ghb 1) ---
+        if (msgLower.startsWith('whb 1') || msgLower.startsWith('ghb 1')) {
+            const huntTypeLabel = msgLower.startsWith('ghb 1') ? "GOD HUNTBOT" : "OWO HUNTBOT";
             const sessionKey = `${userId}_${huntTypeLabel}`;
             const targetTime = activeTimers.get(`${sessionKey}_target`);
 
@@ -281,10 +281,10 @@ client.on('messageCreate', async (message) => {
                     const finishDate = new Date(targetTime);
                     const finishTimeFormatted = finishDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-                    return message.channel.send(`⏳ **${message.author.username}**, **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi (Selesai pukul ${finishTimeFormatted}).`);
+                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi (Selesai pukul ${finishTimeFormatted}).`);
                 }
             }
-            return message.channel.send(`❓ **${message.author.username}**, tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
+            return message.channel.send(`❓ Tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
         }
 
         let usedPrefix = null;
@@ -333,6 +333,7 @@ client.on('messageCreate', async (message) => {
                 const targetPlayer = getRpgPlayer(targetUser.id, targetUser.username);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
 
+                // Jika argumen kedua adalah 'reset' atau 'all', buat saldo jadi 0
                 if (args[0]?.toLowerCase() === 'reset' || args[0]?.toLowerCase() === 'all' || args[1]?.toLowerCase() === 'reset') {
                     targetPlayer.balance = 0;
                     return message.channel.send(`🧹 Berhasil mereset saldo koin <@${targetUser.id}> menjadi **0**!`);
@@ -408,7 +409,7 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s / !ws) ---
+            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) ---
             if (command === 'slot' || command === 'slots' || command === 's' || command === 'ws') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
@@ -417,42 +418,13 @@ client.on('messageCreate', async (message) => {
 
                 if (args.length > 0) {
                     const arg0 = args[0].toLowerCase();
-                    if (arg0 === 'prefix' || arg0 === 'owoprefix' || arg0 === 'hunt' || arg0 === 'godh' || arg0 === 'god' || arg0 === 'owo' || arg0 === 'pray' || arg0 === 'vote') {
-                        // JIKA TERNYATA INI ADALAH PERINTAH SETTING YANG DIMAKSUD (misal !s prefix), LEMPAR KE HANDLER SETTING DI BAWAH
-                        // Tapi karena ini di dalam blok slot, kita lewati agar tidak error, atau kita biarkan masuk ke blok 's' / 'set' di bawah.
-                        // (Cara amannya: biarkan fungsi s / set menangani jika ada argumen konfigurasi)
-                    } else {
-                        if (arg0 === 'all') {
-                            betAmount = Math.min(player.balance, maxBet);
-                        } else if (!isNaN(args[0])) {
-                            betAmount = parseInt(args[0]);
-                            if (betAmount > maxBet) betAmount = maxBet;
-                            if (betAmount < 1) betAmount = 1;
-                        }
+                    if (arg0 === 'all') {
+                        betAmount = Math.min(player.balance, maxBet);
+                    } else if (!isNaN(args[0])) {
+                        betAmount = parseInt(args[0]);
+                        if (betAmount > maxBet) betAmount = maxBet;
+                        if (betAmount < 1) betAmount = 1;
                     }
-                }
-
-                // Cek jika perintah `!s` ternyata dipakai buat setting server (misal `!s prefix .` atau `!s owo ...`)
-                if (args.length > 0 && ['prefix', 'owoprefix', 'hunt', 'godh', 'god', 'owo', 'pray', 'vote'].includes(args[0]?.toLowerCase())) {
-                    const subCmd = args.shift()?.toLowerCase();
-                    const newMsg = args.join(" ");
-
-                    if (subCmd === 'prefix') {
-                        if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} s prefix .\``);
-                        serverCfg.botPrefix = args[0];
-                        return message.channel.send(`✅ Bot prefix berhasil diubah menjadi \`${serverCfg.botPrefix}\``);
-                    }
-                    if (subCmd === 'owoprefix') {
-                        if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} s owoprefix w\``);
-                        serverCfg.owoPrefix = args[0];
-                        return message.channel.send(`✅ OwO prefix berhasil diubah menjadi \`${serverCfg.owoPrefix}\``);
-                    }
-
-                    if (subCmd === 'hunt') { serverCfg.huntMsg = newMsg; return message.channel.send(`✅ Updated **hunt** msg.`); }
-                    if (subCmd === 'godh' || subCmd === 'god') { serverCfg.godMsg = newMsg; return message.channel.send(`✅ Updated **god hunt** msg.`); }
-                    if (subCmd === 'owo') { serverCfg.owoMsg = newMsg; return message.channel.send(`✅ Updated **owo** msg.`); }
-                    if (subCmd === 'pray') { serverCfg.prayMsg = newMsg; return message.channel.send(`✅ Updated **pray** msg.`); }
-                    if (subCmd === 'vote') { serverCfg.voteMsg = newMsg; return message.channel.send(`✅ Updated **vote** msg.`); }
                 }
 
                 if (player.balance < betAmount) {
@@ -472,44 +444,82 @@ client.on('messageCreate', async (message) => {
                 const getRandomSlot = () => allItems[Math.floor(Math.random() * allItems.length)];
 
                 const sentMsg = await message.channel.send(
-                    `${animatedSlot} | ${animatedSlot} | ${animatedSlot} | **${message.author.username}** spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`
+                    `___SLOTS___\n` +
+                    `${animatedSlot}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                    `|                      |\n` +
+                    `|                      |`
                 );
 
                 const randChance = Math.random() * 100;
-                let r1, r2, r3, resultText = '';
+                let r1, r2, r3;
+                let multiplier = 0;
+                let resultText = '';
 
                 if (randChance < 1.0) {
-                    r1 = slots6; r2 = slots5; r3 = slots6;
-                    const totalWon = betAmount * 10;
+                    r1 = slots6; r2 = slots5; r3 = slots6; 
+                    multiplier = 10;
+                    const totalWon = betAmount * multiplier;
                     player.balance += (totalWon - betAmount);
-                    resultText = `🎉 JACKPOT! Won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**`;
-                } else if (randChance < 5.0) {
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉 JACKPOT OWO!!`;
+                } else if (randChance < 4.0) {
                     r1 = slots4; r2 = slots4; r3 = slots4;
-                    const totalWon = betAmount * 4;
+                    multiplier = 4;
+                    const totalWon = betAmount * multiplier;
                     player.balance += (totalWon - betAmount);
-                    resultText = `🎉 Won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**`;
-                } else if (randChance < 15.0) {
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
+                } else if (randChance < 10.0) {
+                    r1 = slots3; r2 = slots3; r3 = slots3;
+                    multiplier = 3;
+                    const totalWon = betAmount * multiplier;
+                    player.balance += (totalWon - betAmount);
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
+                } else if (randChance < 25.0) {
                     r1 = slots2; r2 = slots2; r3 = slots2;
-                    const totalWon = betAmount * 2;
+                    multiplier = 2;
+                    const totalWon = betAmount * multiplier;
                     player.balance += (totalWon - betAmount);
-                    resultText = `👍 Won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**`;
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
+                } else if (randChance < 45.0) {
+                    r1 = slots1; r2 = slots1; r3 = slots1;
+                    multiplier = 1;
+                    const totalWon = betAmount * multiplier; 
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
                 } else {
-                    r1 = getRandomSlot(); r2 = getRandomSlot(); r3 = getRandomSlot();
-                    if (r1 === r2 && r2 === r3) r3 = allItems[(allItems.indexOf(r1) + 1) % allItems.length];
+                    r1 = getRandomSlot();
+                    r2 = getRandomSlot();
+                    r3 = getRandomSlot();
+                    if (r1 === r2 && r2 === r3) {
+                        r3 = allItems[(allItems.indexOf(r1) + 2) % allItems.length];
+                    }
                     player.balance -= betAmount;
-                    resultText = `and lost it all... :c`;
+                    resultText = `and won nothing... :c`;
                 }
 
                 setTimeout(async () => {
-                    await sentMsg.edit(`${r1} | ${animatedSlot} | ${animatedSlot} | **${message.author.username}** spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`).catch(() => {});
+                    await sentMsg.edit(
+                        `___SLOTS___\n` +
+                        `${r1}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `|                      |\n` +
+                        `|                      |`
+                    ).catch(() => {});
                 }, 900);
 
                 setTimeout(async () => {
-                    await sentMsg.edit(`${r1} | ${animatedSlot} | ${r3} | **${message.author.username}** spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`).catch(() => {});
+                    await sentMsg.edit(
+                        `___SLOTS___\n` +
+                        `${r1}  ${animatedSlot}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `|                      |\n` +
+                        `|                      |`
+                    ).catch(() => {});
                 }, 1800);
 
                 setTimeout(async () => {
-                    await sentMsg.edit(`${r1} | ${r2} | ${r3} | **${message.author.username}** spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** ${resultText}`).catch(() => {});
+                    await sentMsg.edit(
+                        `___SLOTS___\n` +
+                        `${r1}  ${r2}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `|                      |     ${resultText}\n` +
+                        `|                      |`
+                    ).catch(() => {});
                 }, 2700);
 
                 return;
@@ -522,18 +532,18 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send(`${currencyEmoji} | **${message.author.username}**, you currently have **${player.balance.toLocaleString('id-ID')}** cowoncy!`);
             }
 
-            // --- ⚙️ SERVER SETTINGS (SET) ---
-            if (command === 'set') {
+            // --- ⚙️ SERVER SETTINGS ---
+            if (command === 's' || command === 'set') {
                 const subCmd = args.shift()?.toLowerCase();
                 const newMsg = args.join(" ");
 
                 if (subCmd === 'prefix') {
-                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} set prefix .\``);
+                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} s prefix .\``);
                     serverCfg.botPrefix = args[0];
                     return message.channel.send(`✅ Bot prefix berhasil diubah menjadi \`${serverCfg.botPrefix}\``);
                 }
                 if (subCmd === 'owoprefix') {
-                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} set owoprefix w\``);
+                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} s owoprefix w\``);
                     serverCfg.owoPrefix = args[0];
                     return message.channel.send(`✅ OwO prefix berhasil diubah menjadi \`${serverCfg.owoPrefix}\``);
                 }
