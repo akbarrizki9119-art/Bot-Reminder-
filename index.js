@@ -23,7 +23,7 @@ const rpgPlayers = new Map();
 const notifiedSessions = new Map();
 
 // 👑 MASUKKAN DISCORD USER ID LU DI SINI SUPAYA JADI OWNER UTAMA BOT!
-const OWNER_IDS = ['1435043081316466720']; 
+const OWNER_IDS = ['MASUKKAN_ID_DISCORD_LU_DISINI']; 
 
 function getServerConfig(guildId) {
     if (!serverSettings.has(guildId)) {
@@ -97,8 +97,8 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
             `\`${prefix} whb 1\` : Cek sisa waktu huntbot aktif\n` +
             `\`${prefix} ghb 1\` : Cek sisa waktu god huntbot aktif\n\n` +
             `**🎰 CASINO MINIGAMES (Max Bet: 250.000)**\n` +
-            `\`${prefix} cf [jumlah/all] [h/t]\` : Coinflip\n` +
-            `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine (Terong, Love, Ceri, Duit, OWO)\n` +
+            `\`${prefix} cf [jumlah/all] [h/t]\` : Coinflip (OwO Style)\n` +
+            `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine (OwO Style)\n` +
             `\`${prefix} bal\` : Cek saldo koin\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\``
@@ -128,42 +128,6 @@ function createServerSettingsEmbed(guildId) {
             `☘️ **pray/curse:** \`${config.botPrefix} s pray <pesan>\`\n` +
             `🗳️ **vote:** \`${config.botPrefix} s vote <pesan>\``
         );
-}
-
-function createSettingsEmbed(user, type) {
-    const config = getUserConfig(user.id);
-    const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
-    const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
-    const isEnabled = config[keyMap[type]];
-    const currentMode = config[modeMap[type]];
-
-    return new EmbedBuilder()
-        .setColor(isEnabled ? getRandomColor() : '#F04747')
-        .setAuthor({ name: `${user.username}'s ${type} settings`, iconURL: user.displayAvatarURL() })
-        .setDescription(
-            `${isEnabled ? '✅' : '❌'} **Reminder Enabled?**\n` +
-            `${config.pingsEnabled ? '✅' : '❌'} **Pings Enabled?**\n` +
-            `${config.replyEnabled ? '✅' : '❌'} **Inline Reply?**\n` +
-            `💬 **Mode:** \`${currentMode?.toUpperCase() || 'TEXT'}\``
-        );
-}
-
-function createSettingsButtons(user, type) {
-    const config = getUserConfig(user.id);
-    const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
-    const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
-    const isEnabled = config[keyMap[type]];
-
-    return [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`toggle_enable_${type}_${user.id}`).setLabel(type).setEmoji('⚔️').setStyle(isEnabled ? ButtonStyle.Success : ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`toggle_ping_${type}_${user.id}`).setLabel('ping').setEmoji('🔴').setStyle(config.pingsEnabled ? ButtonStyle.Success : ButtonStyle.Secondary)
-        ),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`toggle_reply_${type}_${user.id}`).setLabel('reply').setEmoji('↩️').setStyle(config.replyEnabled ? ButtonStyle.Success : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`toggle_mode_${type}_${user.id}`).setLabel(`mode: ${config[modeMap[type]]}`).setEmoji('🖼️').setStyle(ButtonStyle.Primary)
-        )
-    ];
 }
 
 // --- 📩 MESSAGE EVENT HANDLER ---
@@ -230,7 +194,6 @@ client.on('messageCreate', async (message) => {
                         clearTimeout(activeTimers.get(sessionKey));
                     }
 
-                    // Simpan data target waktu selesai untuk fitur whb 1 / ghb 1
                     activeTimers.set(`${sessionKey}_target`, finishTimestamp);
 
                     message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\` (Selesai pukul ${timeStringFormatted})`).catch(() => {});
@@ -312,11 +275,11 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send(`👑 **[OWNER COMMAND]** Berhasil menambahkan \`${amountToAdd.toLocaleString('id-ID')}\` koin ke akun <@${targetUser.id}>!\n🪙 Saldo sekarang: \`${targetPlayer.balance.toLocaleString('id-ID')}\``);
             }
 
-            // --- 🪙 MINIGAME: COINFLIP (!cf) DENGAN MAX BET 250K & "ALL" ---
+            // --- 🪙 MINIGAME: COINFLIP (!cf) OWO STYLE ---
             if (command === 'cf' || command === 'coinflip') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
-                let betAmount = 1;
+                let betAmount = 100; 
                 let choice = 'heads';
                 const maxBet = 250000;
 
@@ -346,19 +309,26 @@ client.on('messageCreate', async (message) => {
                     return message.channel.send(`❌ Saldo koin kamu tidak cukup! Saldo kamu saat ini: \`${player.balance.toLocaleString('id-ID')}\``);
                 }
 
-                const currencyEmoji = '<:slots4:1549105355605287022>';
-                const spinningCoin = '<a:slots:1549103089984999585>';
+                // Emoji resmi OwO sesuai data
+                const currencyEmoji = '<:cowoncy:1549122224252784691>';
+                const spinningEmoji = '<a:coinflip:1549103223825240074>';
+                const headsEmoji = '<:heads:1549103331459203154>';
+                const tailsEmoji = '<:tails:1549103379194847366>';
 
-                const sentMsg = await message.channel.send(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${spinningCoin}`);
+                const sentMsg = await message.reply({
+                    content: `<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${spinningEmoji}`,
+                    allowedMentions: { users: [userId] }
+                });
 
                 setTimeout(async () => {
                     const isWin = Math.random() < 0.5;
                     const actualResult = isWin ? choice : (choice === 'heads' ? 'tails' : 'heads');
-                    const resultEmoji = actualResult === 'heads' ? '🟡' : '🪙';
+                    const resultEmoji = actualResult === 'heads' ? headsEmoji : tailsEmoji;
 
                     if (isWin) {
                         player.balance += betAmount;
-                        await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you won ${currencyEmoji} **${(betAmount * 2).toLocaleString('id-ID')}**!!`);
+                        const winAmount = betAmount * 2;
+                        await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you won ${currencyEmoji} **${winAmount.toLocaleString('id-ID')}**!!`);
                     } else {
                         player.balance -= betAmount;
                         await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you lost ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**!!`);
@@ -367,11 +337,11 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !slots / !s / !ws) FULL GAMBAR & MAX BET ---
+            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) OWO STYLE ---
             if (command === 'slot' || command === 'slots' || command === 's' || command === 'ws') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
-                let betAmount = 1;
+                let betAmount = 100;
                 const maxBet = 250000;
 
                 if (args.length > 0) {
@@ -389,77 +359,94 @@ client.on('messageCreate', async (message) => {
                     return message.channel.send(`❌ Saldo koin kamu kurang! Saldo kamu: \`${player.balance.toLocaleString('id-ID')}\``);
                 }
 
-                const slots1 = '<:slots1:1549105223555883188>'; // Terong (Balik modal 1x)
-                const slots2 = '<:slots2:1549105269299089458>'; // Love (Win x2)
-                const slots3 = '<:slots3:1549105305797918751>'; // Ceri (Win x3)
-                const slots4 = '<:slots4:1549105355605287022>'; // Duit (Win x4)
-                const slots5 = '<:slots5:1549105397384609844>'; // W (Jackpot)
-                const slots6 = '<:slots6:1549105439017541642>'; // O (Jackpot)
-
+                // Emoji Resmi OwO & Slot dengan spasi rapi
+                const currencyEmoji = '<:cowoncy:1549122224252784691>';
+                const slots1 = '<:slots1:1549105223555883188>';
+                const slots2 = '<:slots2:1549105269299089458>';
+                const slots3 = '<:slots3:1549105305797918751>';
+                const slots4 = '<:slots4:1549105355605287022>';
+                const slots5 = '<:slots5:1549105397384609844>';
+                const slots6 = '<:slots6:1549105439017541642>';
                 const animatedSlot = '<a:slots:1549103089984999585>';
+
                 const allItems = [slots1, slots2, slots3, slots4, slots5, slots6];
                 const getRandomSlot = () => allItems[Math.floor(Math.random() * allItems.length)];
 
-                const sentMsg = await message.channel.send(`_SLOTS_\n${animatedSlot}${animatedSlot}${animatedSlot} **${message.author.username}** bet \`${betAmount.toLocaleString('id-ID')}\``);
+                // Pesan awal (animasi muter awal)
+                const sentMsg = await message.channel.send(
+                    `___SLOTS___\n${animatedSlot}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`
+                );
+
+                // Tentukan hasil akhir di awal
+                const randChance = Math.random() * 100;
+                let r1, r2, r3;
+                let multiplier = 0;
+                let resultType = '';
+
+                if (randChance < 1.0) {
+                    r1 = slots6; r2 = slots5; r3 = slots6; 
+                    multiplier = 10;
+                    const totalWon = betAmount * multiplier;
+                    player.balance += totalWon - betAmount;
+                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉 JACKPOT OWO!!`;
+                } else if (randChance < 4.0) {
+                    r1 = slots4; r2 = slots4; r3 = slots4;
+                    multiplier = 4;
+                    const totalWon = betAmount * multiplier;
+                    player.balance += totalWon - betAmount;
+                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
+                } else if (randChance < 10.0) {
+                    r1 = slots3; r2 = slots3; r3 = slots3;
+                    multiplier = 3;
+                    const totalWon = betAmount * multiplier;
+                    player.balance += totalWon - betAmount;
+                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
+                } else if (randChance < 25.0) {
+                    r1 = slots2; r2 = slots2; r3 = slots2;
+                    multiplier = 2;
+                    const totalWon = betAmount * multiplier;
+                    player.balance += totalWon - betAmount;
+                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
+                } else if (randChance < 45.0) {
+                    r1 = slots1; r2 = slots1; r3 = slots1;
+                    multiplier = 1;
+                    const totalWon = betAmount * multiplier; 
+                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
+                } else {
+                    r1 = getRandomSlot();
+                    r2 = getRandomSlot();
+                    r3 = getRandomSlot();
+                    if (r1 === r2 && r2 === r3) {
+                        r3 = allItems[(allItems.indexOf(r1) + 2) % allItems.length];
+                    }
+                    player.balance -= betAmount;
+                    resultType = `and won nothing... :c`;
+                }
+
+                // Animasi jeda bertahap (1 per 1 kotak) ala OwO
+                setTimeout(async () => {
+                    await sentMsg.edit(`___SLOTS___\n${r1}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`).catch(() => {});
+                }, 700);
 
                 setTimeout(async () => {
-                    const randChance = Math.random() * 100;
-                    let r1, r2, r3;
-                    let multiplier = 0;
-                    let resultType = '';
+                    await sentMsg.edit(`___SLOTS___\n${r1}  ${r2}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`).catch(() => {});
+                }, 1400);
 
-                    if (randChance < 1.0) {
-                        r1 = slots6; r2 = slots5; r3 = slots6; // OWO Format
-                        multiplier = 10;
-                        const totalWon = betAmount * multiplier;
-                        player.balance += totalWon - betAmount;
-                        resultType = `and won **${totalWon.toLocaleString('id-ID')}**! 🎉 JACKPOT OWO!!`;
-                    } else if (randChance < 4.0) {
-                        r1 = slots4; r2 = slots4; r3 = slots4;
-                        multiplier = 4;
-                        const totalWon = betAmount * multiplier;
-                        player.balance += totalWon - betAmount;
-                        resultType = `and won **${totalWon.toLocaleString('id-ID')}**! 🎉`;
-                    } else if (randChance < 10.0) {
-                        r1 = slots3; r2 = slots3; r3 = slots3;
-                        multiplier = 3;
-                        const totalWon = betAmount * multiplier;
-                        player.balance += totalWon - betAmount;
-                        resultType = `and won **${totalWon.toLocaleString('id-ID')}**! 🎉`;
-                    } else if (randChance < 25.0) {
-                        r1 = slots2; r2 = slots2; r3 = slots2;
-                        multiplier = 2;
-                        const totalWon = betAmount * multiplier;
-                        player.balance += totalWon - betAmount;
-                        resultType = `and won **${totalWon.toLocaleString('id-ID')}**! 👍`;
-                    } else if (randChance < 45.0) {
-                        r1 = slots1; r2 = slots1; r3 = slots1;
-                        multiplier = 1;
-                        const totalWon = betAmount * multiplier; 
-                        resultType = `and won **${totalWon.toLocaleString('id-ID')}**! 👍`;
-                    } else {
-                        r1 = getRandomSlot();
-                        r2 = getRandomSlot();
-                        r3 = getRandomSlot();
-                        if (r1 === r2 && r2 === r3) {
-                            r3 = allItems[(allItems.indexOf(r1) + 2) % allItems.length];
-                        }
-                        player.balance -= betAmount;
-                        resultType = `and won nothing... :c`;
-                    }
+                setTimeout(async () => {
+                    await sentMsg.edit(`___SLOTS___\n${r1}  ${r2}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n${resultType}`).catch(() => {});
+                }, 2100);
 
-                    await sentMsg.edit(`_SLOTS_\n${r1}${r2}${r3} **${message.author.username}** bet \`${betAmount.toLocaleString('id-ID')}\`\n${resultType}`);
-                }, 2000);
                 return;
             }
 
             // --- 🪙 CEK SALDO (!bal) ---
             if (command === 'bal' || command === 'balance') {
                 const player = getRpgPlayer(userId, message.author.username);
-                return message.channel.send(`🪙 Saldo koin **${message.author.username}**: \`${player.balance.toLocaleString('id-ID')}\``);
+                const currencyEmoji = '<:cowoncy:1549122224252784691>';
+                return message.channel.send(`🪙 Saldo koin **${message.author.username}**: ${currencyEmoji} \`${player.balance.toLocaleString('id-ID')}\``);
             }
 
-            // --- 🛠️ UTILITY COMMANDS HANDLER ---
+            // --- 🛠️ UTILITY COMMANDS ---
             if (command === 'ping') {
                 const sent = await message.channel.send("🏓 Measuring latency...");
                 const latency = sent.createdTimestamp - message.createdTimestamp;
@@ -560,7 +547,6 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
-        const parts = interaction.customId.split('_');
         const guildId = interaction.guild?.id || 'dm';
         const serverCfg = getServerConfig(guildId);
 
@@ -578,22 +564,6 @@ client.on('interactionCreate', async (interaction) => {
 
         if (interaction.customId === 'help_settings') {
             return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
-        }
-
-        if (parts[0] === 'toggle') {
-            const [, key, type, ownerId] = parts;
-            if (interaction.user.id !== ownerId) return interaction.reply({ content: '❌ Bukan settinganmu!', ephemeral: true });
-
-            const config = getUserConfig(ownerId);
-            const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
-            const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
-
-            if (key === 'enable') config[keyMap[type]] = !config[keyMap[type]];
-            if (key === 'ping') config.pingsEnabled = !config.pingsEnabled;
-            if (key === 'reply') config.replyEnabled = !config.replyEnabled;
-            if (key === 'mode') config[modeMap[type]] = config[modeMap[type]] === 'text' ? 'gif' : 'text';
-
-            return interaction.update({ embeds: [createSettingsEmbed(interaction.user, type)], components: createSettingsButtons(interaction.user, type) });
         }
     } catch (err) {
         console.error("Button error:", err);
