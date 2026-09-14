@@ -19,7 +19,7 @@ const userSettings = new Map();
 const activeTimers = new Map();
 const rpgPlayers = new Map(); 
 
-// Menyimpan status DM pengingat agar tidak spam
+// Menyimpan status pengingat agar tidak spam/double
 const notifiedSessions = new Map();
 
 // 👑 MASUKKAN DISCORD USER ID LU DI SINI SUPAYA JADI OWNER UTAMA BOT!
@@ -197,13 +197,6 @@ client.on('messageCreate', async (message) => {
 
                 const durationString = durationParts.join(' ') || 'beberapa saat';
                 const finishTimestamp = Date.now() + totalMs;
-                
-                const finishDate = new Date(finishTimestamp);
-                const timeStringFormatted = finishDate.toLocaleTimeString('id-ID', { 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    hour12: false 
-                });
 
                 let targetUser = message.mentions.users.first();
                 let huntTypeLabel = "OWO HUNTBOT";
@@ -230,15 +223,16 @@ client.on('messageCreate', async (message) => {
 
                 if (totalMs > 0 && targetUser) {
                     const sessionKey = `${targetUser.id}_${huntTypeLabel}`;
-                    notifiedSessions.set(sessionKey, false);
 
+                    // Clear timer & reset notifikasi sebelumnya agar tidak dobel/spam
                     if (activeTimers.has(sessionKey)) {
                         clearTimeout(activeTimers.get(sessionKey));
                     }
 
+                    notifiedSessions.set(sessionKey, false);
                     activeTimers.set(`${sessionKey}_target`, finishTimestamp);
 
-                    message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\` (Selesai pukul ${timeStringFormatted})`).catch(() => {});
+                    message.channel.send(`⏳ **${huntTypeLabel}** | Sisa waktu: \`${durationString}\``).catch(() => {});
                     
                     const timer = setTimeout(async () => {
                         try {
@@ -278,10 +272,7 @@ client.on('messageCreate', async (message) => {
                     const remHour = Math.floor(remMin / 60);
                     const displayTime = remHour > 0 ? `${remHour}j ${remMin % 60}m` : `${remMin}m ${remSec % 60}d`;
                     
-                    const finishDate = new Date(targetTime);
-                    const finishTimeFormatted = finishDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi (Selesai pukul ${finishTimeFormatted}).`);
+                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi.`);
                 }
             }
             return message.channel.send(`❓ Tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
