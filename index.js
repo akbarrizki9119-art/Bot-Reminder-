@@ -67,9 +67,7 @@ function getUserConfig(userId) {
 
 function getRpgPlayer(userId, username = "Hero") {
     if (!rpgPlayers.has(userId)) {
-        // 👑 Khusus owner langsung dapet 100 Juta koin
         const initialBalance = OWNER_IDS.includes(userId) ? 100000000 : 1000;
-
         rpgPlayers.set(userId, {
             name: username,
             balance: initialBalance, 
@@ -101,7 +99,7 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
             `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine (OwO Style)\n` +
             `\`${prefix} bal\` : Cek saldo koin\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
-            `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\``
+            `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\` | \`${prefix} user\` | \`${prefix} server\` | \`${prefix} avatar\``
         )
         .setFooter({ text: `Server ${guildName || 'OPPAI'}`, iconURL: avatarURL || client.user.displayAvatarURL() });
 }
@@ -128,6 +126,42 @@ function createServerSettingsEmbed(guildId) {
             `☘️ **pray/curse:** \`${config.botPrefix} s pray <pesan>\`\n` +
             `🗳️ **vote:** \`${config.botPrefix} s vote <pesan>\``
         );
+}
+
+function createSettingsEmbed(user, type) {
+    const config = getUserConfig(user.id);
+    const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
+    const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
+    const isEnabled = config[keyMap[type]];
+    const currentMode = config[modeMap[type]];
+
+    return new EmbedBuilder()
+        .setColor(isEnabled ? getRandomColor() : '#F04747')
+        .setAuthor({ name: `${user.username}'s ${type} settings`, iconURL: user.displayAvatarURL() })
+        .setDescription(
+            `${isEnabled ? '✅' : '❌'} **Reminder Enabled?**\n` +
+            `${config.pingsEnabled ? '✅' : '❌'} **Pings Enabled?**\n` +
+            `${config.replyEnabled ? '✅' : '❌'} **Inline Reply?**\n` +
+            `💬 **Mode:** \`${currentMode?.toUpperCase() || 'TEXT'}\``
+        );
+}
+
+function createSettingsButtons(user, type) {
+    const config = getUserConfig(user.id);
+    const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
+    const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
+    const isEnabled = config[keyMap[type]];
+
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`toggle_enable_${type}_${user.id}`).setLabel(type).setEmoji('⚔️').setStyle(isEnabled ? ButtonStyle.Success : ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`toggle_ping_${type}_${user.id}`).setLabel('ping').setEmoji('🔴').setStyle(config.pingsEnabled ? ButtonStyle.Success : ButtonStyle.Secondary)
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`toggle_reply_${type}_${user.id}`).setLabel('reply').setEmoji('↩️').setStyle(config.replyEnabled ? ButtonStyle.Success : ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`toggle_mode_${type}_${user.id}`).setLabel(`mode: ${config[modeMap[type]]}`).setEmoji('🖼️').setStyle(ButtonStyle.Primary)
+        )
+    ];
 }
 
 // --- 📩 MESSAGE EVENT HANDLER ---
@@ -256,7 +290,7 @@ client.on('messageCreate', async (message) => {
             }
             if (command === 'settings') return message.channel.send({ embeds: [createServerSettingsEmbed(guildId)] });
 
-            // --- 👑 OWNER COMMAND: ADD CASH (!addcash) ---
+            // --- 👑 OWNER COMMAND: ADD CASH (!addcash) - TANPA LABEL OWNER ---
             if (command === 'addcash' || command === 'give' || command === 'addmoney') {
                 if (!OWNER_IDS.includes(userId)) {
                     return message.channel.send(`❌ Perintah ini khusus untuk **Owner Bot**!`);
@@ -271,8 +305,9 @@ client.on('messageCreate', async (message) => {
 
                 const targetPlayer = getRpgPlayer(targetUser.id, targetUser.username);
                 targetPlayer.balance += amountToAdd;
+                const currencyEmoji = '<:cowoncy:1549122224252784691>';
 
-                return message.channel.send(`👑 **[OWNER COMMAND]** Berhasil menambahkan \`${amountToAdd.toLocaleString('id-ID')}\` koin ke akun <@${targetUser.id}>!\n🪙 Saldo sekarang: \`${targetPlayer.balance.toLocaleString('id-ID')}\``);
+                return message.channel.send(`Berhasil menambahkan ${currencyEmoji} **${amountToAdd.toLocaleString('id-ID')}** koin ke akun <@${targetUser.id}>!\n🪙 Saldo sekarang: ${currencyEmoji} **${targetPlayer.balance.toLocaleString('id-ID')}**`);
             }
 
             // --- 🪙 MINIGAME: COINFLIP (!cf) OWO STYLE ---
@@ -309,7 +344,6 @@ client.on('messageCreate', async (message) => {
                     return message.channel.send(`❌ Saldo koin kamu tidak cukup! Saldo kamu saat ini: \`${player.balance.toLocaleString('id-ID')}\``);
                 }
 
-                // Emoji resmi OwO sesuai data
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
                 const spinningEmoji = '<a:coinflip:1549103223825240074>';
                 const headsEmoji = '<:heads:1549103331459203154>';
@@ -331,13 +365,13 @@ client.on('messageCreate', async (message) => {
                         await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you won ${currencyEmoji} **${winAmount.toLocaleString('id-ID')}**!!`);
                     } else {
                         player.balance -= betAmount;
-                        await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you lost ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**!!`);
+                        await sentMsg.edit(`<@${userId}> spent ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}** and chose **${choice}**\nThe coin spins... ${resultEmoji} and you lost it all... :c`);
                     }
                 }, 1500);
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) OWO STYLE ---
+            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) DENGAN GARIS & URUTAN KIRI, KANAN, TENGAH ---
             if (command === 'slot' || command === 'slots' || command === 's' || command === 'ws') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
@@ -359,7 +393,6 @@ client.on('messageCreate', async (message) => {
                     return message.channel.send(`❌ Saldo koin kamu kurang! Saldo kamu: \`${player.balance.toLocaleString('id-ID')}\``);
                 }
 
-                // Emoji Resmi OwO & Slot dengan spasi rapi
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
                 const slots1 = '<:slots1:1549105223555883188>';
                 const slots2 = '<:slots2:1549105269299089458>';
@@ -372,46 +405,49 @@ client.on('messageCreate', async (message) => {
                 const allItems = [slots1, slots2, slots3, slots4, slots5, slots6];
                 const getRandomSlot = () => allItems[Math.floor(Math.random() * allItems.length)];
 
-                // Pesan awal (animasi muter awal)
+                // Pesan awal dengan format garis OwO asli
                 const sentMsg = await message.channel.send(
-                    `___SLOTS___\n${animatedSlot}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`
+                    `___SLOTS___\n` +
+                    `${animatedSlot}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                    `|                      |\n` +
+                    `|                      |`
                 );
 
                 // Tentukan hasil akhir di awal
                 const randChance = Math.random() * 100;
                 let r1, r2, r3;
                 let multiplier = 0;
-                let resultType = '';
+                let resultText = '';
 
                 if (randChance < 1.0) {
                     r1 = slots6; r2 = slots5; r3 = slots6; 
                     multiplier = 10;
                     const totalWon = betAmount * multiplier;
-                    player.balance += totalWon - betAmount;
-                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉 JACKPOT OWO!!`;
+                    player.balance += (totalWon - betAmount);
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉 JACKPOT OWO!!`;
                 } else if (randChance < 4.0) {
                     r1 = slots4; r2 = slots4; r3 = slots4;
                     multiplier = 4;
                     const totalWon = betAmount * multiplier;
-                    player.balance += totalWon - betAmount;
-                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
+                    player.balance += (totalWon - betAmount);
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
                 } else if (randChance < 10.0) {
                     r1 = slots3; r2 = slots3; r3 = slots3;
                     multiplier = 3;
                     const totalWon = betAmount * multiplier;
-                    player.balance += totalWon - betAmount;
-                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
+                    player.balance += (totalWon - betAmount);
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
                 } else if (randChance < 25.0) {
                     r1 = slots2; r2 = slots2; r3 = slots2;
                     multiplier = 2;
                     const totalWon = betAmount * multiplier;
-                    player.balance += totalWon - betAmount;
-                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
+                    player.balance += (totalWon - betAmount);
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
                 } else if (randChance < 45.0) {
                     r1 = slots1; r2 = slots1; r3 = slots1;
                     multiplier = 1;
                     const totalWon = betAmount * multiplier; 
-                    resultType = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
+                    resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
                 } else {
                     r1 = getRandomSlot();
                     r2 = getRandomSlot();
@@ -420,33 +456,87 @@ client.on('messageCreate', async (message) => {
                         r3 = allItems[(allItems.indexOf(r1) + 2) % allItems.length];
                     }
                     player.balance -= betAmount;
-                    resultType = `and won nothing... :c`;
+                    resultText = `and won nothing... :c`;
                 }
 
-                // Animasi jeda bertahap (1 per 1 kotak) ala OwO
+                // --- ANIMASI SLOT BERTAHAP (Urutan: Kiri -> Kanan -> Tengah) ---
                 setTimeout(async () => {
-                    await sentMsg.edit(`___SLOTS___\n${r1}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`).catch(() => {});
-                }, 700);
+                    await sentMsg.edit(
+                        `___SLOTS___\n` +
+                        `${r1}  ${animatedSlot}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `|                      |\n` +
+                        `|                      |`
+                    ).catch(() => {});
+                }, 900);
 
                 setTimeout(async () => {
-                    await sentMsg.edit(`___SLOTS___\n${r1}  ${r2}  ${animatedSlot}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**`).catch(() => {});
-                }, 1400);
+                    await sentMsg.edit(
+                        `___SLOTS___\n` +
+                        `${r1}  ${animatedSlot}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `|                      |\n` +
+                        `|                      |`
+                    ).catch(() => {});
+                }, 1800);
 
                 setTimeout(async () => {
-                    await sentMsg.edit(`___SLOTS___\n${r1}  ${r2}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n${resultType}`).catch(() => {});
-                }, 2100);
+                    await sentMsg.edit(
+                        `___SLOTS___\n` +
+                        `${r1}  ${r2}  ${r3}     **${message.author.username}** bet ${currencyEmoji} **${betAmount.toLocaleString('id-ID')}**\n` +
+                        `|                      |     ${resultText}\n` +
+                        `|                      |`
+                    ).catch(() => {});
+                }, 2700);
 
                 return;
             }
 
-            // --- 🪙 CEK SALDO (!bal) ---
+            // --- 🪙 CEK SALDO (!bal) - FORMAT OWO STYLE ---
             if (command === 'bal' || command === 'balance') {
                 const player = getRpgPlayer(userId, message.author.username);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
-                return message.channel.send(`🪙 Saldo koin **${message.author.username}**: ${currencyEmoji} \`${player.balance.toLocaleString('id-ID')}\``);
+                return message.channel.send(`${currencyEmoji} | **${message.author.username}**, you currently have **${player.balance.toLocaleString('id-ID')}** cowoncy!`);
             }
 
-            // --- 🛠️ UTILITY COMMANDS ---
+            // --- ⚙️ SERVER SETTINGS ---
+            if (command === 's' || command === 'set') {
+                const subCmd = args.shift()?.toLowerCase();
+                const newMsg = args.join(" ");
+
+                if (subCmd === 'prefix') {
+                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} s prefix .\``);
+                    serverCfg.botPrefix = args[0];
+                    return message.channel.send(`✅ Bot prefix berhasil diubah menjadi \`${serverCfg.botPrefix}\``);
+                }
+                if (subCmd === 'owoprefix') {
+                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} s owoprefix w\``);
+                    serverCfg.owoPrefix = args[0];
+                    return message.channel.send(`✅ OwO prefix berhasil diubah menjadi \`${serverCfg.owoPrefix}\``);
+                }
+
+                if (subCmd === 'hunt') { serverCfg.huntMsg = newMsg; return message.channel.send(`✅ Updated **hunt** msg.`); }
+                if (subCmd === 'godh' || subCmd === 'god') { serverCfg.godMsg = newMsg; return message.channel.send(`✅ Updated **god hunt** msg.`); }
+                if (subCmd === 'owo') { serverCfg.owoMsg = newMsg; return message.channel.send(`✅ Updated **owo** msg.`); }
+                if (subCmd === 'pray') { serverCfg.prayMsg = newMsg; return message.channel.send(`✅ Updated **pray** msg.`); }
+                if (subCmd === 'vote') { serverCfg.voteMsg = newMsg; return message.channel.send(`✅ Updated **vote** msg.`); }
+            }
+
+            if (['owoh', 'godh', 'owo', 'owopray', 'owovote'].includes(command)) {
+                return message.channel.send({ embeds: [createSettingsEmbed(message.author, command)], components: createSettingsButtons(message.author, command) });
+            }
+
+            if (command === 'gif') {
+                const kategori = args[0]?.toLowerCase();
+                const linkGif = args[1];
+                if (!kategori || !linkGif) return message.channel.send(`❌ Format: \`${usedPrefix} gif godh <link_gif>\``);
+                if (kategori === 'owo') userCfg.owoGif = linkGif;
+                else if (kategori === 'hunt' || kategori === 'owoh') userCfg.huntGif = linkGif;
+                else if (kategori === 'godh' || kategori === 'god' || kategori === 'gh') userCfg.godGif = linkGif;
+                else if (kategori === 'pray' || kategori === 'owopray') userCfg.prayGif = linkGif;
+                else if (kategori === 'vote' || kategori === 'owovote') userCfg.voteGif = linkGif;
+                return message.channel.send(`✅ GIF **${kategori}** diperbarui!`);
+            }
+
+            // --- 🛠️ UTILITY COMMANDS HANDLER ---
             if (command === 'ping') {
                 const sent = await message.channel.send("🏓 Measuring latency...");
                 const latency = sent.createdTimestamp - message.createdTimestamp;
@@ -468,6 +558,27 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
+            if (command === 'user') {
+                const targetUser = message.mentions.users.first() || message.author;
+                const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setAuthor({ name: `User Info - ${targetUser.username}`, iconURL: targetUser.displayAvatarURL() })
+                    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 512 }))
+                    .addFields(
+                        { name: '👤 Username', value: `${targetUser.tag}`, inline: true },
+                        { name: '🆔 User ID', value: `\`${targetUser.id}\``, inline: true },
+                        { name: '📅 Akun Dibuat', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: false }
+                    );
+
+                if (member) {
+                    embed.addFields({ name: '📥 Masuk Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true });
+                }
+
+                return message.channel.send({ embeds: [embed] });
+            }
+
             if (command === 'uptime') {
                 let totalSeconds = (client.uptime / 1000);
                 let days = Math.floor(totalSeconds / 86400);
@@ -478,6 +589,30 @@ client.on('messageCreate', async (message) => {
                 let seconds = Math.floor(totalSeconds % 60);
 
                 return message.channel.send(`⏰ **Bot Uptime:** \`${days}d ${hours}h ${minutes}m ${seconds}s\``);
+            }
+
+            if (command === 'server') {
+                const guild = message.guild;
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`Server Info - ${guild.name}`)
+                    .setThumbnail(guild.iconURL({ dynamic: true }))
+                    .addFields(
+                        { name: '👑 Owner', value: `<@${guild.ownerId}>`, inline: true },
+                        { name: '👥 Member Count', value: `\`${guild.memberCount}\` members`, inline: true },
+                        { name: '📅 Server Dibuat', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
+                    );
+                return message.channel.send({ embeds: [embed] });
+            }
+
+            if (command === 'avatar' || command === 'av') {
+                const targetUser = message.mentions.users.first() || message.author;
+                const avatarURL = targetUser.displayAvatarURL({ dynamic: true, size: 1024 });
+                const embed = new EmbedBuilder()
+                    .setColor(getRandomColor())
+                    .setTitle(`Avatar - ${targetUser.username}`)
+                    .setImage(avatarURL);
+                return message.channel.send({ embeds: [embed] });
             }
         }
 
@@ -547,6 +682,7 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
+        const parts = interaction.customId.split('_');
         const guildId = interaction.guild?.id || 'dm';
         const serverCfg = getServerConfig(guildId);
 
@@ -558,12 +694,35 @@ client.on('interactionCreate', async (interaction) => {
             const embed = new EmbedBuilder()
                 .setColor(getRandomColor())
                 .setTitle('🛠️ Commands Utilitas')
-                .setDescription(`\`${serverCfg.botPrefix} ping\` | \`${serverCfg.botPrefix} uptime\` | \`${serverCfg.botPrefix} clear <jumlah>\``);
+                .setDescription(
+                    `\`${serverCfg.botPrefix} ping\` : Cek delay respon bot\n` +
+                    `\`${serverCfg.botPrefix} clear <jumlah>\` : Hapus chat spam secara cepat\n` +
+                    `\`${serverCfg.botPrefix} user [@user]\` : Tampilkan detail info user\n` +
+                    `\`${serverCfg.botPrefix} uptime\` : Cek durasi bot menyala\n` +
+                    `\`${serverCfg.botPrefix} server\` : Informasi server Discord\n` +
+                    `\`${serverCfg.botPrefix} avatar [@user]\` : Ambil foto profil HD`
+                );
             return interaction.update({ embeds: [embed], components: [createHelpButtons()] });
         }
 
         if (interaction.customId === 'help_settings') {
             return interaction.update({ embeds: [createServerSettingsEmbed(guildId)], components: [createHelpButtons()] });
+        }
+
+        if (parts[0] === 'toggle') {
+            const [, key, type, ownerId] = parts;
+            if (interaction.user.id !== ownerId) return interaction.reply({ content: '❌ Bukan settinganmu!', ephemeral: true });
+
+            const config = getUserConfig(ownerId);
+            const keyMap = { owoh: 'huntEnabled', godh: 'godEnabled', owo: 'owoEnabled', owopray: 'prayEnabled', owovote: 'voteEnabled' };
+            const modeMap = { owoh: 'huntMode', godh: 'godMode', owo: 'owoMode', owopray: 'prayMode', owovote: 'voteMode' };
+
+            if (key === 'enable') config[keyMap[type]] = !config[keyMap[type]];
+            if (key === 'ping') config.pingsEnabled = !config.pingsEnabled;
+            if (key === 'reply') config.replyEnabled = !config.replyEnabled;
+            if (key === 'mode') config[modeMap[type]] = config[modeMap[type]] === 'text' ? 'gif' : 'text';
+
+            return interaction.update({ embeds: [createSettingsEmbed(interaction.user, type)], components: createSettingsButtons(interaction.user, type) });
         }
     } catch (err) {
         console.error("Button error:", err);
