@@ -575,18 +575,18 @@ client.on('messageCreate', async (message) => {
 
                 const buildMinesEmbed = (statusType, currentWin = 0, currentMult = 0.00, nextWin = 0, nextMult = 1.00) => {
                     let embedColor = statusType === 'lose' ? '#ED4245' : (statusType === 'cashout' || statusType === 'win' ? '#57F287' : '#2F3136');
-                    let titleText = statusType === 'lose' ? `💥 **<@${userId}>** touched a mine!` : (statusType === 'cashout' ? `💎 **<@${userId}>** cashed out!` : `💎 **<@${userId}>** started a mines game.`);
+                    let titleText = statusType === 'lose' ? '💥 **<@' + userId + '**> touched a mine!' : (statusType === 'cashout' ? '💎 **<@' + userId + '**> cashed out!' : '💎 **<@' + userId + '**> started a mines game.');
 
                     let desc = 
-                        `\`\`\`\n` +
-                        `Bet:  ${betAmount.toLocaleString('id-ID')}   Mines: ${mineCount}\n` +
-                        (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
-                        (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
-                        `────────────────────────\n` +
-                        `Status: ${statusType === 'playing' ? 'Sedang Bermain...' : 'Game Berakhir'}\n` +
-                        `\`\`\``;
+                        '```\n' +
+                        'Bet:  ' + betAmount.toLocaleString('id-ID') + '   Mines: ' + mineCount + '\n' +
+                        (statusType === 'lose' ? 'Cash Out: 0 (0.00x)\n' : 'Winnings: ' + currentWin.toLocaleString('id-ID') + ' (' + currentMult.toFixed(2) + 'x)\n') +
+                        (statusType === 'playing' ? 'Next:     ' + nextWin.toLocaleString('id-ID') + ' (' + nextMult.toFixed(2) + 'x)\n' : '') +
+                        '────────────────────────\n' +
+                        'Status: ' + (statusType === 'playing' ? 'Sedang Bermain...' : 'Game Berakhir') + '\n' +
+                        '```';
 
-                    return new EmbedBuilder().setColor(embedColor).setDescription(`${titleText}\n${desc}`);
+                    return new EmbedBuilder().setColor(embedColor).setDescription(titleText + '\n' + desc);
                 };
 
                 const generateComponents = (isEnded = false) => {
@@ -858,18 +858,18 @@ client.on('interactionCreate', async (interaction) => {
 
             const buildMinesEmbed = (statusType, currentWin = 0, currentMult = 0.00, nextWin = 0, nextMult = 1.00) => {
                 let embedColor = statusType === 'lose' ? '#ED4245' : (statusType === 'cashout' || statusType === 'win' ? '#57F287' : '#2F3136');
-                let titleText = statusType === 'lose' ? `💥 **<@${ownerId}>** touched a mine!` : (statusType === 'cashout' ? `💎 **<@${ownerId}>** cashed out!` : `💎 **<@${ownerId}>** started a mines game.`);
+                let titleText = statusType === 'lose' ? '💥 **<@' + ownerId + '**> touched a mine!' : (statusType === 'cashout' ? '💎 **<@' + ownerId + '**> cashed out!' : '💎 **<@' + ownerId + '**> started a mines game.');
 
                 let desc = 
-                    `\`\`\`\n` +
-                    `Bet:  ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\n` +
-                    (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
-                    (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
-                    `────────────────────────\n` +
-                    `Status: ${statusType === 'playing' ? 'Sedang Bermain...' : 'Game Berakhir'}\n` +
-                    `\`\`\`;
+                    '```\n' +
+                    'Bet:  ' + gameData.bet.toLocaleString('id-ID') + '   Mines: ' + gameData.mines + '\n' +
+                    (statusType === 'lose' ? 'Cash Out: 0 (0.00x)\n' : 'Winnings: ' + currentWin.toLocaleString('id-ID') + ' (' + currentMult.toFixed(2) + 'x)\n') +
+                    (statusType === 'playing' ? 'Next:     ' + nextWin.toLocaleString('id-ID') + ' (' + nextMult.toFixed(2) + 'x)\n' : '') +
+                    '────────────────────────\n' +
+                    'Status: ' + (statusType === 'playing' ? 'Sedang Bermain...' : 'Game Berakhir') + '\n' +
+                    '```';
 
-                return new EmbedBuilder().setColor(embedColor).setDescription(`${titleText}\n${desc}`);
+                return new EmbedBuilder().setColor(embedColor).setDescription(titleText + '\n' + desc);
             };
 
             const generateComponents = (isEnded = false, clickedIndex = null) => {
