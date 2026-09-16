@@ -524,14 +524,14 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 💣 MINIGAME: MINES (!m / !mine) STYLE OWO ---
+            // --- 💣 MINIGAME: MINES (!m / !mine) STYLE OWO EMBED ---
             if (command === 'm' || command === 'mine') {
                 const player = getRpgPlayer(userId, message.author.username);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
                 const maxBet = 250000;
 
                 let betAmount = 100;
-                let mineCount = 1; // Default 1 bom seperti owo
+                let mineCount = 1;
 
                 if (args.length > 0) {
                     const arg0 = args[0].toLowerCase();
@@ -554,7 +554,6 @@ client.on('messageCreate', async (message) => {
                     return message.channel.send(`❌ Saldo koin kamu kurang! Saldo kamu: ${currencyEmoji} \`${player.balance.toLocaleString('id-ID')}\``);
                 }
 
-                // Potong saldo di awal
                 player.balance -= betAmount;
 
                 let minePositions = [];
@@ -586,6 +585,34 @@ client.on('messageCreate', async (message) => {
 
                 activeTimers.set(minesSessionKey, gameData);
 
+                const buildMinesEmbed = (statusType, currentWin = 0, currentMult = 0.00, nextWin = 0, nextMult = 1.00) => {
+                    let embedColor = '#2F3136'; 
+                    let titleText = `💎 **<@${userId}>** started a mines game.`;
+                    
+                    if (statusType === 'cashout') {
+                        embedColor = '#57F287';
+                        titleText = `💎 **<@${userId}>** cashed out!`;
+                    } else if (statusType === 'win') {
+                        embedColor = '#57F287';
+                        titleText = `👑 **<@${userId}>** cleared all safe spots! JACKPOT!!`;
+                    } else if (statusType === 'lose') {
+                        embedColor = '#ED4245';
+                        titleText = `💥 **<@${userId}>** touched a mine!`;
+                    }
+
+                    let desc = 
+                        `\`\`\`\n` +
+                        `Bet:  ${betAmount.toLocaleString('id-ID')}   Mines: ${mineCount}\n` +
+                        (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
+                        (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
+                        `\`\`\`\n` +
+                        `────────────────────────`;
+
+                    return new EmbedBuilder()
+                        .setColor(embedColor)
+                        .setDescription(`${titleText}\n${desc}`);
+                };
+
                 const generateMinesComponents = (isEnded = false) => {
                     let rows = [];
                     for (let r = 0; r < 3; r++) {
@@ -602,7 +629,6 @@ client.on('messageCreate', async (message) => {
                                 style = ButtonStyle.Success;
                                 disabled = true;
                             } else if (isEnded) {
-                                // Saat game berakhir, tampilkan posisi bom & diamond asli sesuai posisi
                                 if (gameData.minePositions.includes(index)) {
                                     label = "💣";
                                     style = ButtonStyle.Danger;
@@ -621,9 +647,6 @@ client.on('messageCreate', async (message) => {
                     }
 
                     let currentOpened = gameData.opened.length;
-                    let currentMult = currentOpened > 0 ? calculateMultiplier(currentOpened, mineCount) : 0.00;
-                    let currentWin = Math.floor(betAmount * currentMult);
-
                     let cashOutRow = new ActionRowBuilder().addComponents(
                         new ButtonBuilder()
                             .setCustomId(`mine_cashout_${userId}`)
@@ -636,18 +659,11 @@ client.on('messageCreate', async (message) => {
                     return rows;
                 };
 
-                let nextMult = calculateMultiplier(1, mineCount);
-                let nextWin = Math.floor(betAmount * nextMult);
-
-                let headerText = 
-                    `💎 **<@${userId}>** started a mines game.\n` +
-                    `\`Bet: ${betAmount.toLocaleString('id-ID')}   Mines: ${mineCount}\`\n` +
-                    `\`Winnings: 0 (0.00x)\`\n` +
-                    `\`Next: ${nextWin.toLocaleString('id-ID')} (${nextMult}x)\`\n` +
-                    `────────────────────────`;
+                let initialNextMult = calculateMultiplier(1, mineCount);
+                let initialNextWin = Math.floor(betAmount * initialNextMult);
 
                 const sentGameMsg = await message.channel.send({
-                    content: headerText,
+                    embeds: [buildMinesEmbed('playing', 0, 0.00, initialNextWin, initialNextMult)],
                     components: generateMinesComponents(false)
                 });
 
@@ -853,7 +869,7 @@ client.on('interactionCreate', async (interaction) => {
 
         // --- 💣 INTERAKSI TOMBOL MINES ---
         if (interaction.customId.startsWith('mine_click_') || interaction.customId.startsWith('mine_cashout_')) {
-            const actionType = parts[1]; // 'click' atau 'cashout'
+            const actionType = parts[1]; 
             const ownerId = parts[2];
             
             if (interaction.user.id !== ownerId) {
@@ -864,11 +880,10 @@ client.on('interactionCreate', async (interaction) => {
             const gameData = activeTimers.get(minesSessionKey);
 
             if (!gameData || gameData.gameOver) {
-                return interaction.update({ content: '❌ Game ini sudah selesai atau kedaluwarsa.', components: [] });
+                return interaction.update({ content: '❌ Game ini sudah selesai atau kedaluwarsa.', embeds: [], components: [] });
             }
 
             const player = getRpgPlayer(ownerId, interaction.user.username);
-            const currencyEmoji = '<:cowoncy:1549122224252784691>';
 
             const calculateMultiplier = (openedCount, mCount) => {
                 let mult = 1.0;
@@ -878,7 +893,60 @@ client.on('interactionCreate', async (interaction) => {
                 return Math.max(1.0, parseFloat((mult * 0.99).toFixed(2)));
             };
 
-            // Tombol Cash Out
+            const buildMinesEmbed = (statusType, currentWin = 0, currentMult = 0.00, nextWin = 0, nextMult = 1.00) => {
+                let embedColor = '#2F3136';
+                let titleText = `💎 **<@${ownerId}>** started a mines game.`;
+                
+                if (statusType === 'cashout') {
+                    embedColor = '#57F287';
+                    titleText = `💎 **<@${ownerId}>** cashed out!`;
+                } else if (statusType === 'win') {
+                    embedColor = '#57F287';
+                    titleText = `👑 **<@${ownerId}>** cleared all safe spots! JACKPOT!!`;
+                } else if (statusType === 'lose') {
+                    embedColor = '#ED4245';
+                    titleText = `💥 **<@${ownerId}>** touched a mine!`;
+                }
+
+                let desc = 
+                    `\`\`\`\n` +
+                    `Bet:  ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\n` +
+                    (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
+                    (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
+                    `\`\`\`\n` +
+                    `────────────────────────`;
+
+                return new EmbedBuilder()
+                    .setColor(embedColor)
+                    .setDescription(`${titleText}\n${desc}`);
+            };
+
+            const generateEndedComponents = () => {
+                let rows = [];
+                for (let r = 0; r < 3; r++) {
+                    let rowComponents = new ActionRowBuilder();
+                    for (let c = 0; c < 3; c++) {
+                        let index = r * 3 + c;
+                        let label = "💎";
+                        let style = ButtonStyle.Secondary;
+
+                        if (gameData.minePositions.includes(index)) {
+                            label = "💣";
+                            style = ButtonStyle.Danger;
+                        } else if (gameData.opened.includes(index)) {
+                            label = "💎";
+                            style = ButtonStyle.Success;
+                        }
+
+                        rowComponents.addComponents(
+                            new ButtonBuilder().setCustomId(`disabled_${index}`).setLabel(label).setStyle(style).setDisabled(true)
+                        );
+                    }
+                    rows.push(rowComponents);
+                }
+                return rows;
+            };
+
             if (actionType === 'cashout') {
                 gameData.gameOver = true;
                 const openedCount = gameData.opened.length;
@@ -888,42 +956,12 @@ client.on('interactionCreate', async (interaction) => {
                 player.balance += totalWin;
                 activeTimers.delete(minesSessionKey);
 
-                let winText = 
-                    `💎 **<@${ownerId}>** cashed out!\n` +
-                    `\`Bet: ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\`\n` +
-                    `\`Winnings: ${totalWin.toLocaleString('id-ID')} (${finalMult}x)\`\n` +
-                    `────────────────────────`;
-
-                let rows = [];
-                for (let r = 0; r < 3; r++) {
-                    let rowComponents = new ActionRowBuilder();
-                    for (let c = 0; c < 3; c++) {
-                        let index = r * 3 + c;
-                        let label = "?";
-                        let style = ButtonStyle.Secondary;
-
-                        if (gameData.opened.includes(index)) {
-                            label = "💎";
-                            style = ButtonStyle.Success;
-                        } else if (gameData.minePositions.includes(index)) {
-                            label = "💣";
-                            style = ButtonStyle.Danger;
-                        } else {
-                            label = "💎";
-                            style = ButtonStyle.Secondary;
-                        }
-
-                        rowComponents.addComponents(
-                            new ButtonBuilder().setCustomId(`disabled_${index}`).setLabel(label).setStyle(style).setDisabled(true)
-                        );
-                    }
-                    rows.push(rowComponents);
-                }
-
-                return interaction.update({ content: winText, components: rows });
+                return interaction.update({
+                    embeds: [buildMinesEmbed('cashout', totalWin, finalMult)],
+                    components: generateEndedComponents()
+                });
             }
 
-            // Tombol Grid Box
             if (actionType === 'click') {
                 const index = parseInt(parts[3]);
 
@@ -935,18 +973,12 @@ client.on('interactionCreate', async (interaction) => {
                     gameData.gameOver = true;
                     activeTimers.delete(minesSessionKey);
 
-                    let loseText = 
-                        `💥 **<@${ownerId}>** hit a mine and lost it all... :c\n` +
-                        `\`Bet: ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\`\n` +
-                        `\`Winnings: 0 (0.00x)\`\n` +
-                        `────────────────────────`;
-
                     let rows = [];
                     for (let r = 0; r < 3; r++) {
                         let rowComponents = new ActionRowBuilder();
                         for (let c = 0; c < 3; c++) {
                             let idx = r * 3 + c;
-                            let label = "?";
+                            let label = "💎";
                             let style = ButtonStyle.Secondary;
 
                             if (idx === index) {
@@ -958,9 +990,6 @@ client.on('interactionCreate', async (interaction) => {
                             } else if (gameData.opened.includes(idx)) {
                                 label = "💎";
                                 style = ButtonStyle.Success;
-                            } else {
-                                label = "💎";
-                                style = ButtonStyle.Secondary;
                             }
 
                             rowComponents.addComponents(
@@ -970,7 +999,10 @@ client.on('interactionCreate', async (interaction) => {
                         rows.push(rowComponents);
                     }
 
-                    return interaction.update({ content: loseText, components: rows });
+                    return interaction.update({
+                        embeds: [buildMinesEmbed('lose')],
+                        components: rows
+                    });
                 }
 
                 gameData.opened.push(index);
@@ -984,27 +1016,10 @@ client.on('interactionCreate', async (interaction) => {
                     player.balance += totalWin;
                     activeTimers.delete(minesSessionKey);
 
-                    let perfectText = 
-                        `👑 **<@${ownerId}>** cleared all safe spots! JACKPOT!!\n` +
-                        `\`Bet: ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\`\n` +
-                        `\`Winnings: ${totalWin.toLocaleString('id-ID')} (${finalMult}x)\`\n` +
-                        `────────────────────────`;
-
-                    let rows = [];
-                    for (let r = 0; r < 3; r++) {
-                        let rowComponents = new ActionRowBuilder();
-                        for (let c = 0; c < 3; c++) {
-                            let idx = r * 3 + c;
-                            let label = gameData.minePositions.includes(idx) ? "💣" : "💎";
-                            let style = gameData.minePositions.includes(idx) ? ButtonStyle.Danger : ButtonStyle.Success;
-                            rowComponents.addComponents(
-                                new ButtonBuilder().setCustomId(`disabled_${idx}`).setLabel(label).setStyle(style).setDisabled(true)
-                            );
-                        }
-                        rows.push(rowComponents);
-                    }
-
-                    return interaction.update({ content: perfectText, components: rows });
+                    return interaction.update({
+                        embeds: [buildMinesEmbed('win', totalWin, finalMult)],
+                        components: generateEndedComponents()
+                    });
                 }
 
                 const currentMult = calculateMultiplier(openedCount, gameData.mines);
@@ -1012,13 +1027,6 @@ client.on('interactionCreate', async (interaction) => {
                 
                 const nextMult = calculateMultiplier(openedCount + 1, gameData.mines);
                 const nextWin = Math.floor(gameData.bet * nextMult);
-
-                let updatedDesc = 
-                    `💎 **<@${ownerId}>** started a mines game.\n` +
-                    `\`Bet: ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\`\n` +
-                    `\`Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult}x)\`\n` +
-                    `\`Next: ${nextWin.toLocaleString('id-ID')} (${nextMult}x)\`\n` +
-                    `────────────────────────`;
 
                 let rows = [];
                 for (let r = 0; r < 3; r++) {
@@ -1051,7 +1059,10 @@ client.on('interactionCreate', async (interaction) => {
                     )
                 );
 
-                return interaction.update({ content: updatedDesc, components: rows });
+                return interaction.update({
+                    embeds: [buildMinesEmbed('playing', currentWin, currentMult, nextWin, nextMult)],
+                    components: rows
+                });
             }
         }
 
