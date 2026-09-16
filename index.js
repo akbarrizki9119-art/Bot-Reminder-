@@ -19,11 +19,11 @@ const userSettings = new Map();
 const activeTimers = new Map();
 const rpgPlayers = new Map(); 
 
-// Menyimpan status pengingat agar tidak spam/double
+// Menyimpan status DM pengingat agar tidak spam
 const notifiedSessions = new Map();
 
 // 👑 MASUKKAN DISCORD USER ID LU DI SINI SUPAYA JADI OWNER UTAMA BOT!
-const OWNER_IDS = ['1435043081316466720']; 
+const OWNER_IDS = ['MASUKKAN_ID_DISCORD_LU_DISINI']; 
 
 function getServerConfig(guildId) {
     if (!serverSettings.has(guildId)) {
@@ -88,7 +88,7 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
         .setAuthor({ name: '🏓 Reminders, Casino & Utility Menu', iconURL: client.user.displayAvatarURL() })
         .setDescription(
             `Gunakan \`${prefix} help\` untuk melihat bantuan.\n\n` +
-            `⚙️ **Ubah Prefix Bot:** \`${prefix} set prefix <baru>\`\n\n` +
+            `⚙️ **Ubah Prefix Bot:** \`${prefix} s prefix <baru>\`\n\n` +
             `**👑 OWNER COMMANDS**\n` +
             `\`${prefix} addcash [jumlah] [@user]\` : Tambah koin\n` +
             `\`${prefix} removecash [jumlah] [@user]\` : Kurangi / reset koin\n\n` +
@@ -98,7 +98,8 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
             `\`${prefix} ghb 1\` : Cek sisa waktu god huntbot aktif\n\n` +
             `**🎰 CASINO MINIGAMES (Max Bet: 250.000)**\n` +
             `\`${prefix} cf [jumlah/all] [h/t]\` : Coinflip (OwO Style)\n` +
-            `\`${prefix} s\` / \`${prefix} slot\` / \`${prefix} slots\` / \`${prefix} ws\` [jumlah/all] : Slot Machine\n` +
+            `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine\n` +
+            `\`${prefix} m [jumlah/all] [bom]\` : Mines Game (Grid 3x3)\n` +
             `\`${prefix} cash\` atau \`${prefix} bal\` : Cek saldo koin\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\` | \`${prefix} user\` | \`${prefix} server\` | \`${prefix} avatar\``
@@ -121,12 +122,12 @@ function createServerSettingsEmbed(guildId) {
         .setTitle('Server Settings')
         .setDescription(
             `⚙️ **OwO prefix:** \`${config.owoPrefix}\`\n` +
-            `🤖 **Bot prefix:** \`${config.botPrefix}\` (\`${config.botPrefix} set prefix <baru>\`)\n\n` +
-            `🌱 **owo:** \`${config.botPrefix} set owo <pesan>\`\n` +
-            `🏹 **hunt:** \`${config.botPrefix} set hunt <pesan>\`\n` +
-            `⚡ **god hunt:** \`${config.botPrefix} set godh <pesan>\`\n` +
-            `☘️ **pray/curse:** \`${config.botPrefix} set pray <pesan>\`\n` +
-            `🗳️ **vote:** \`${config.botPrefix} set vote <pesan>\``
+            `🤖 **Bot prefix:** \`${config.botPrefix}\` (\`${config.botPrefix} s prefix <baru>\`)\n\n` +
+            `🌱 **owo:** \`${config.botPrefix} s owo <pesan>\`\n` +
+            `🏹 **hunt:** \`${config.botPrefix} s hunt <pesan>\`\n` +
+            `⚡ **god hunt:** \`${config.botPrefix} s godh <pesan>\`\n` +
+            `☘️ **pray/curse:** \`${config.botPrefix} s pray <pesan>\`\n` +
+            `🗳️ **vote:** \`${config.botPrefix} s vote <pesan>\``
         );
 }
 
@@ -197,6 +198,13 @@ client.on('messageCreate', async (message) => {
 
                 const durationString = durationParts.join(' ') || 'beberapa saat';
                 const finishTimestamp = Date.now() + totalMs;
+                
+                const finishDate = new Date(finishTimestamp);
+                const timeStringFormatted = finishDate.toLocaleTimeString('id-ID', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    hour12: false 
+                });
 
                 let targetUser = message.mentions.users.first();
                 let huntTypeLabel = "OWO HUNTBOT";
@@ -223,15 +231,15 @@ client.on('messageCreate', async (message) => {
 
                 if (totalMs > 0 && targetUser) {
                     const sessionKey = `${targetUser.id}_${huntTypeLabel}`;
+                    notifiedSessions.set(sessionKey, false);
 
                     if (activeTimers.has(sessionKey)) {
                         clearTimeout(activeTimers.get(sessionKey));
                     }
 
-                    notifiedSessions.set(sessionKey, false);
                     activeTimers.set(`${sessionKey}_target`, finishTimestamp);
 
-                    message.channel.send(`⏳ **${huntTypeLabel}** | Sisa waktu: \`${durationString}\``).catch(() => {});
+                    message.channel.send(`⏰ Pengingat **${huntTypeLabel}** dipasang untuk <@${targetUser.id}>!\n⏳ **Sisa waktu:** \`${durationString}\` (Selesai pukul ${timeStringFormatted})`).catch(() => {});
                     
                     const timer = setTimeout(async () => {
                         try {
@@ -258,8 +266,7 @@ client.on('messageCreate', async (message) => {
 
         // --- COMMAND CEK TIMER MANUAL (whb 1 / ghb 1) ---
         if (msgLower.startsWith('whb 1') || msgLower.startsWith('ghb 1')) {
-            const isGodHunt = msgLower.startsWith('ghb 1');
-            const huntTypeLabel = isGodHunt ? "GOD HUNTBOT" : "OWO HUNTBOT";
+            const huntTypeLabel = msgLower.startsWith('ghb 1') ? "GOD HUNTBOT" : "OWO HUNTBOT";
             const sessionKey = `${userId}_${huntTypeLabel}`;
             const targetTime = activeTimers.get(`${sessionKey}_target`);
 
@@ -271,19 +278,19 @@ client.on('messageCreate', async (message) => {
                     const remHour = Math.floor(remMin / 60);
                     const displayTime = remHour > 0 ? `${remHour}j ${remMin % 60}m` : `${remMin}m ${remSec % 60}d`;
                     
-                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi.`);
+                    const finishDate = new Date(targetTime);
+                    const finishTimeFormatted = finishDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                    return message.channel.send(`⏳ **${huntTypeLabel}** kamu tersisa sekitar \`${displayTime}\` lagi (Selesai pukul ${finishTimeFormatted}).`);
                 }
             }
             return message.channel.send(`❓ Tidak ada timer aktif untuk **${huntTypeLabel}** kamu saat ini.`);
         }
 
-        // --- DETEKSI PREFIX OTOMATIS (Mendukung prefix custom user & !pai) ---
         let usedPrefix = null;
-        const currentPrefix = serverCfg.botPrefix ? serverCfg.botPrefix.toLowerCase() : "!";
-        
         if (msgLower.startsWith('!pai')) {
             usedPrefix = '!pai';
-        } else if (msgLower.startsWith(currentPrefix)) {
+        } else if (serverCfg.botPrefix && msgLower.startsWith(serverCfg.botPrefix.toLowerCase())) {
             usedPrefix = serverCfg.botPrefix;
         }
 
@@ -401,8 +408,8 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!s / !slot / !slots / !ws) ---
-            if (command === 's' || command === 'slot' || command === 'slots' || command === 'ws') {
+            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) ---
+            if (command === 'slot' || command === 'slots' || command === 's' || command === 'ws') {
                 const player = getRpgPlayer(userId, message.author.username);
                 
                 let betAmount = 100;
@@ -428,17 +435,12 @@ client.on('messageCreate', async (message) => {
                 const slots2 = '<:slots2:1549105269299089458>';
                 const slots3 = '<:slots3:1549105305797918751>';
                 const slots4 = '<:slots4:1549105355605287022>';
-                const slots5 = '<:slots5:1549105397384609844>'; // Emoji 'w'
+                const slots5 = '<:slots5:1549105397384609844>';
                 const slots6 = '<:slots6:1549105439017541642>';
                 const animatedSlot = '<a:slots:1549103089984999585>';
 
-                // Kiri & Kanan: TANPA slots5/w
-                const outerItems = [slots1, slots2, slots3, slots4, slots6];
-                const getRandomOuter = () => outerItems[Math.floor(Math.random() * outerItems.length)];
-
-                // Tengah: Boleh ada slots5/w secara acak
-                const middleItems = [slots1, slots2, slots3, slots4, slots5, slots6];
-                const getRandomMiddle = () => middleItems[Math.floor(Math.random() * middleItems.length)];
+                const allItems = [slots1, slots2, slots3, slots4, slots5, slots6];
+                const getRandomSlot = () => allItems[Math.floor(Math.random() * allItems.length)];
 
                 const sentMsg = await message.channel.send(
                     `___SLOTS___\n` +
@@ -449,38 +451,44 @@ client.on('messageCreate', async (message) => {
 
                 const randChance = Math.random() * 100;
                 let r1, r2, r3;
+                let multiplier = 0;
                 let resultText = '';
 
                 if (randChance < 1.0) {
-                    r1 = getRandomOuter(); r2 = slots5; r3 = getRandomOuter(); 
-                    const totalWon = betAmount * 10;
+                    r1 = slots6; r2 = slots5; r3 = slots6; 
+                    multiplier = 10;
+                    const totalWon = betAmount * multiplier;
                     player.balance += (totalWon - betAmount);
                     resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉 JACKPOT OWO!!`;
                 } else if (randChance < 4.0) {
                     r1 = slots4; r2 = slots4; r3 = slots4;
-                    const totalWon = betAmount * 4;
+                    multiplier = 4;
+                    const totalWon = betAmount * multiplier;
                     player.balance += (totalWon - betAmount);
                     resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
                 } else if (randChance < 10.0) {
                     r1 = slots3; r2 = slots3; r3 = slots3;
-                    const totalWon = betAmount * 3;
+                    multiplier = 3;
+                    const totalWon = betAmount * multiplier;
                     player.balance += (totalWon - betAmount);
                     resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 🎉`;
                 } else if (randChance < 25.0) {
                     r1 = slots2; r2 = slots2; r3 = slots2;
-                    const totalWon = betAmount * 2;
+                    multiplier = 2;
+                    const totalWon = betAmount * multiplier;
                     player.balance += (totalWon - betAmount);
                     resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
                 } else if (randChance < 45.0) {
                     r1 = slots1; r2 = slots1; r3 = slots1;
-                    const totalWon = betAmount * 1; 
+                    multiplier = 1;
+                    const totalWon = betAmount * multiplier; 
                     resultText = `and won ${currencyEmoji} **${totalWon.toLocaleString('id-ID')}**! 👍`;
                 } else {
-                    r1 = getRandomOuter();
-                    r2 = getRandomMiddle(); 
-                    r3 = getRandomOuter();
+                    r1 = getRandomSlot();
+                    r2 = getRandomSlot();
+                    r3 = getRandomSlot();
                     if (r1 === r2 && r2 === r3) {
-                        r3 = outerItems[(outerItems.indexOf(r1) + 1) % outerItems.length];
+                        r3 = allItems[(allItems.indexOf(r1) + 2) % allItems.length];
                     }
                     player.balance -= betAmount;
                     resultText = `and won nothing... :c`;
@@ -516,6 +524,131 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
+            // --- 💣 MINIGAME: MINES (!m / !mine) ---
+            if (command === 'm' || command === 'mine') {
+                const player = getRpgPlayer(userId, message.author.username);
+                const currencyEmoji = '<:cowoncy:1549122224252784691>';
+                const maxBet = 250000;
+
+                let betAmount = 100;
+                let mineCount = 3; // Default 3 bom
+
+                if (args.length > 0) {
+                    const arg0 = args[0].toLowerCase();
+                    if (arg0 === 'all') {
+                        betAmount = Math.min(player.balance, maxBet);
+                    } else if (!isNaN(args[0])) {
+                        betAmount = parseInt(args[0]);
+                        if (betAmount > maxBet) betAmount = maxBet;
+                        if (betAmount < 1) betAmount = 1;
+                    }
+
+                    if (args[1] && !isNaN(args[1])) {
+                        mineCount = parseInt(args[1]);
+                        if (mineCount < 1) mineCount = 1;
+                        if (mineCount > 8) mineCount = 8; // Max 8 bom untuk 3x3
+                    }
+                }
+
+                if (player.balance < betAmount) {
+                    return message.channel.send(`❌ Saldo koin kamu kurang! Saldo kamu: ${currencyEmoji} \`${player.balance.toLocaleString('id-ID')}\``);
+                }
+
+                // Potong saldo di awal
+                player.balance -= betAmount;
+
+                let minePositions = [];
+                while (minePositions.length < mineCount) {
+                    let randPos = Math.floor(Math.random() * 9);
+                    if (!minePositions.includes(randPos)) {
+                        minePositions.push(randPos);
+                    }
+                }
+
+                const minesSessionKey = `mines_${userId}`;
+                
+                const calculateMultiplier = (openedCount, mCount) => {
+                    let mult = 1.0;
+                    for (let i = 0; i < openedCount; i++) {
+                        mult *= (9 - i) / (9 - mCount - i);
+                    }
+                    return Math.max(1.0, parseFloat((mult * 0.99).toFixed(2)));
+                };
+
+                const gameData = {
+                    bet: betAmount,
+                    mines: mineCount,
+                    minePositions: minePositions,
+                    opened: [],
+                    gameOver: false,
+                    messageRef: null
+                };
+
+                activeTimers.set(minesSessionKey, gameData);
+
+                const generateMinesComponents = (isEnded = false) => {
+                    let rows = [];
+                    for (let r = 0; r < 3; r++) {
+                        let rowComponents = new ActionRowBuilder();
+                        for (let c = 0; c < 3; c++) {
+                            let index = r * 3 + c;
+                            let btnId = `mine_click_${userId}_${index}`;
+                            let label = "?";
+                            let style = ButtonStyle.Secondary;
+                            let disabled = isEnded;
+
+                            if (gameData.opened.includes(index)) {
+                                label = "💎";
+                                style = ButtonStyle.Success;
+                                disabled = true;
+                            } else if (isEnded && gameData.minePositions.includes(index)) {
+                                label = "💣";
+                                style = ButtonStyle.Danger;
+                                disabled = true;
+                            }
+
+                            rowComponents.addComponents(
+                                new ButtonBuilder().setCustomId(btnId).setLabel(label).setStyle(style).setDisabled(disabled)
+                            );
+                        }
+                        rows.push(rowComponents);
+                    }
+
+                    let currentOpened = gameData.opened.length;
+                    let currentMult = currentOpened > 0 ? calculateMultiplier(currentOpened, mineCount) : 0.00;
+                    let currentWin = Math.floor(betAmount * currentMult);
+
+                    let cashOutRow = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`mine_cashout_${userId}`)
+                            .setLabel(`Cash Out (${currentWin.toLocaleString('id-ID')})`)
+                            .setEmoji('🟢')
+                            .setStyle(ButtonStyle.Success)
+                            .setDisabled(isEnded || currentOpened === 0)
+                    );
+
+                    rows.push(cashOutRow);
+                    return rows;
+                };
+
+                let nextMult = calculateMultiplier(1, mineCount);
+                let nextWin = Math.floor(betAmount * nextMult);
+
+                let descText = 
+                    `<@${userId}> started a mines game.\n` +
+                    `Bet: ${betAmount.toLocaleString('id-ID')} ${currencyEmoji} | Mines: ${mineCount}\n` +
+                    `Cash Out: 0 ${currencyEmoji} (0.00x)\n` +
+                    `Next: ${nextWin.toLocaleString('id-ID')} ${currencyEmoji} (${nextMult}x)`;
+
+                const sentGameMsg = await message.channel.send({
+                    content: descText,
+                    components: generateMinesComponents(false)
+                });
+
+                gameData.messageRef = sentGameMsg;
+                return;
+            }
+
             // --- 🪙 CEK SALDO (!cash / !bal) ---
             if (command === 'cash' || command === 'bal' || command === 'balance') {
                 const player = getRpgPlayer(userId, message.author.username);
@@ -523,18 +656,18 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send(`${currencyEmoji} | **${message.author.username}**, you currently have **${player.balance.toLocaleString('id-ID')}** cowoncy!`);
             }
 
-            // --- ⚙️ SERVER SETTINGS (!set) ---
-            if (command === 'set') {
+            // --- ⚙️ SERVER SETTINGS ---
+            if (command === 's' || command === 'set') {
                 const subCmd = args.shift()?.toLowerCase();
                 const newMsg = args.join(" ");
 
                 if (subCmd === 'prefix') {
-                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} set prefix .\``);
+                    if (!args[0]) return message.channel.send(`❌ Masukkan prefix baru! Contoh: \`${usedPrefix} s prefix .\``);
                     serverCfg.botPrefix = args[0];
                     return message.channel.send(`✅ Bot prefix berhasil diubah menjadi \`${serverCfg.botPrefix}\``);
                 }
                 if (subCmd === 'owoprefix') {
-                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} set owoprefix w\``);
+                    if (!args[0]) return message.channel.send(`❌ Masukkan owo prefix baru! Contoh: \`${usedPrefix} s owoprefix w\``);
                     serverCfg.owoPrefix = args[0];
                     return message.channel.send(`✅ OwO prefix berhasil diubah menjadi \`${serverCfg.owoPrefix}\``);
                 }
@@ -711,6 +844,201 @@ client.on('interactionCreate', async (interaction) => {
         const parts = interaction.customId.split('_');
         const guildId = interaction.guild?.id || 'dm';
         const serverCfg = getServerConfig(guildId);
+
+        // --- 💣 INTERAKSI TOMBOL MINES ---
+        if (interaction.customId.startsWith('mine_click_') || interaction.customId.startsWith('mine_cashout_')) {
+            const actionType = parts[1]; // 'click' atau 'cashout'
+            const ownerId = parts[2];
+            
+            if (interaction.user.id !== ownerId) {
+                return interaction.reply({ content: '❌ Ini bukan game Mines kamu!', ephemeral: true });
+            }
+
+            const minesSessionKey = `mines_${ownerId}`;
+            const gameData = activeTimers.get(minesSessionKey);
+
+            if (!gameData || gameData.gameOver) {
+                return interaction.update({ content: '❌ Game ini sudah selesai atau kedaluwarsa.', components: [] });
+            }
+
+            const player = getRpgPlayer(ownerId, interaction.user.username);
+            const currencyEmoji = '<:cowoncy:1549122224252784691>';
+
+            const calculateMultiplier = (openedCount, mCount) => {
+                let mult = 1.0;
+                for (let i = 0; i < openedCount; i++) {
+                    mult *= (9 - i) / (9 - mCount - i);
+                }
+                return Math.max(1.0, parseFloat((mult * 0.99).toFixed(2)));
+            };
+
+            // Tombol Cash Out
+            if (actionType === 'cashout') {
+                gameData.gameOver = true;
+                const openedCount = gameData.opened.length;
+                const finalMult = calculateMultiplier(openedCount, gameData.mines);
+                const totalWin = Math.floor(gameData.bet * finalMult);
+
+                player.balance += totalWin;
+                activeTimers.delete(minesSessionKey);
+
+                let winText = 
+                    `<@${ownerId}> cashed out safely!\n` +
+                    `Bet: ${gameData.bet.toLocaleString('id-ID')} ${currencyEmoji} | Mines: ${gameData.mines}\n` +
+                    `Won: **${totalWin.toLocaleString('id-ID')}** ${currencyEmoji} (**${finalMult}x**) 🎉`;
+
+                let rows = [];
+                for (let r = 0; r < 3; r++) {
+                    let rowComponents = new ActionRowBuilder();
+                    for (let c = 0; c < 3; c++) {
+                        let index = r * 3 + c;
+                        let label = "?";
+                        let style = ButtonStyle.Secondary;
+
+                        if (gameData.opened.includes(index)) {
+                            label = "💎";
+                            style = ButtonStyle.Success;
+                        } else if (gameData.minePositions.includes(index)) {
+                            label = "💣";
+                            style = ButtonStyle.Danger;
+                        }
+
+                        rowComponents.addComponents(
+                            new ButtonBuilder().setCustomId(`disabled_${index}`).setLabel(label).setStyle(style).setDisabled(true)
+                        );
+                    }
+                    rows.push(rowComponents);
+                }
+
+                return interaction.update({ content: winText, components: rows });
+            }
+
+            // Tombol Grid Box
+            if (actionType === 'click') {
+                const index = parseInt(parts[3]);
+
+                if (gameData.opened.includes(index)) {
+                    return interaction.deferUpdate();
+                }
+
+                if (gameData.minePositions.includes(index)) {
+                    gameData.gameOver = true;
+                    activeTimers.delete(minesSessionKey);
+
+                    let loseText = 
+                        `<@${ownerId}> hit a mine and lost it all... :c\n` +
+                        `Bet: ${gameData.bet.toLocaleString('id-ID')} ${currencyEmoji} | Mines: ${gameData.mines}\n` +
+                        `Lost: **${gameData.bet.toLocaleString('id-ID')}** ${currencyEmoji}`;
+
+                    let rows = [];
+                    for (let r = 0; r < 3; r++) {
+                        let rowComponents = new ActionRowBuilder();
+                        for (let c = 0; c < 3; c++) {
+                            let idx = r * 3 + c;
+                            let label = "?";
+                            let style = ButtonStyle.Secondary;
+
+                            if (idx === index) {
+                                label = "💥";
+                                style = ButtonStyle.Danger;
+                            } else if (gameData.minePositions.includes(idx)) {
+                                label = "💣";
+                                style = ButtonStyle.Danger;
+                            } else if (gameData.opened.includes(idx)) {
+                                label = "💎";
+                                style = ButtonStyle.Success;
+                            }
+
+                            rowComponents.addComponents(
+                                new ButtonBuilder().setCustomId(`disabled_${idx}`).setLabel(label).setStyle(style).setDisabled(true)
+                            );
+                        }
+                        rows.push(rowComponents);
+                    }
+
+                    return interaction.update({ content: loseText, components: rows });
+                }
+
+                gameData.opened.push(index);
+                const openedCount = gameData.opened.length;
+                const maxSafeBoxes = 9 - gameData.mines;
+
+                if (openedCount === maxSafeBoxes) {
+                    gameData.gameOver = true;
+                    const finalMult = calculateMultiplier(openedCount, gameData.mines);
+                    const totalWin = Math.floor(gameData.bet * finalMult);
+                    player.balance += totalWin;
+                    activeTimers.delete(minesSessionKey);
+
+                    let perfectText = 
+                        `<@${ownerId}> cleared all safe spots! JACKPOT!!\n` +
+                        `Bet: ${gameData.bet.toLocaleString('id-ID')} ${currencyEmoji} | Mines: ${gameData.mines}\n` +
+                        `Won: **${totalWin.toLocaleString('id-ID')}** ${currencyEmoji} (**${finalMult}x**) 👑`;
+
+                    let rows = [];
+                    for (let r = 0; r < 3; r++) {
+                        let rowComponents = new ActionRowBuilder();
+                        for (let c = 0; c < 3; c++) {
+                            let idx = r * 3 + c;
+                            let label = gameData.minePositions.includes(idx) ? "💣" : "💎";
+                            let style = gameData.minePositions.includes(idx) ? ButtonStyle.Danger : ButtonStyle.Success;
+                            rowComponents.addComponents(
+                                new ButtonBuilder().setCustomId(`disabled_${idx}`).setLabel(label).setStyle(style).setDisabled(true)
+                            );
+                        }
+                        rows.push(rowComponents);
+                    }
+
+                    return interaction.update({ content: perfectText, components: rows });
+                }
+
+                const currentMult = calculateMultiplier(openedCount, gameData.mines);
+                const currentWin = Math.floor(gameData.bet * currentMult);
+                
+                const nextMult = calculateMultiplier(openedCount + 1, gameData.mines);
+                const nextWin = Math.floor(gameData.bet * nextMult);
+
+                let updatedDesc = 
+                    `<@${ownerId}> started a mines game.\n` +
+                    `Bet: ${gameData.bet.toLocaleString('id-ID')} ${currencyEmoji} | Mines: ${gameData.mines}\n` +
+                    `Cash Out: ${currentWin.toLocaleString('id-ID')} ${currencyEmoji} (${currentMult}x)\n` +
+                    `Next: ${nextWin.toLocaleString('id-ID')} ${currencyEmoji} (${nextMult}x)`;
+
+                let rows = [];
+                for (let r = 0; r < 3; r++) {
+                    let rowComponents = new ActionRowBuilder();
+                    for (let c = 0; c < 3; c++) {
+                        let idx = r * 3 + c;
+                        let label = "?";
+                        let style = ButtonStyle.Secondary;
+                        let disabled = false;
+
+                        if (gameData.opened.includes(idx)) {
+                            label = "💎";
+                            style = ButtonStyle.Success;
+                            disabled = true;
+                        }
+
+                        rowComponents.addComponents(
+                            new ButtonBuilder().setCustomId(`mine_click_${ownerId}_${idx}`).setLabel(label).setStyle(style).setDisabled(disabled)
+                        );
+                    }
+                    rows.push(rowComponents);
+                }
+
+                rows.push(
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`mine_cashout_${ownerId}`)
+                            .setLabel(`Cash Out (${currentWin.toLocaleString('id-ID')})`)
+                            .setEmoji('🟢')
+                            .setStyle(ButtonStyle.Success)
+                    )
+                );
+
+                return interaction.update({ content: updatedDesc, components: rows });
+            }
+        }
 
         if (interaction.customId === 'help_reminders') {
             return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
