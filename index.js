@@ -603,8 +603,9 @@ client.on('messageCreate', async (message) => {
                         `Bet:  ${betAmount.toLocaleString('id-ID')}   Mines: ${mineCount}\n` +
                         (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
                         (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
-                        `\`\`\`\n` +
-                        `────────────────────────`;
+                        `────────────────────────\n` +
+                        `Status: ${statusType === 'playing' ? 'Sedang Bermain...' : 'Game Berakhir'}\n` +
+                        `\`\`\`;
 
                     return new EmbedBuilder()
                         .setColor(embedColor)
@@ -911,8 +912,9 @@ client.on('interactionCreate', async (interaction) => {
                     `Bet:  ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\n` +
                     (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
                     (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
-                    `\`\`\`\n` +
-                    `────────────────────────`;
+                    `────────────────────────\n` +
+                    `Status: ${statusType === 'playing' ? 'Sedang Bermain...' : 'Game Berakhir'}\n` +
+                    `\`\`\`;
 
                 return new EmbedBuilder()
                     .setColor(embedColor)
