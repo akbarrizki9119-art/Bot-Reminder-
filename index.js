@@ -99,7 +99,7 @@ function createHelpEmbed(guildName, avatarURL, prefix) {
             `**🎰 CASINO MINIGAMES (Max Bet: 250.000)**\n` +
             `\`${prefix} cf [jumlah/all] [h/t]\` : Coinflip (OwO Style)\n` +
             `\`${prefix} slot\` / \`${prefix} s\` / \`${prefix} ws\` [jumlah/all] : Slot Machine\n` +
-            `\`${prefix} m [jumlah/all] [bom]\` : Mines Game (Grid Embed OwO Style)\n` +
+            `\`${prefix} m [jumlah/all] [bom]\` : Mines Game (Grid 3x3 Ala OwO)\n` +
             `\`${prefix} cash\` atau \`${prefix} bal\` : Cek saldo koin\n\n` +
             `**🛠️ UTILITY COMMANDS**\n` +
             `\`${prefix} ping\` | \`${prefix} uptime\` | \`${prefix} clear <1-100>\` | \`${prefix} user\` | \`${prefix} server\` | \`${prefix} avatar\``
@@ -350,7 +350,6 @@ client.on('messageCreate', async (message) => {
             // --- 🪙 MINIGAME: COINFLIP (!cf) ---
             if (command === 'cf' || command === 'coinflip') {
                 const player = getRpgPlayer(userId, message.author.username);
-                
                 let betAmount = 100; 
                 let choice = 'heads';
                 const maxBet = 250000;
@@ -408,10 +407,9 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 🎰 MINIGAME: SLOT MACHINE (!slot / !s) ---
+            // --- 🎰 MINIGAME: SLOT MACHINE (!slot) ---
             if (command === 'slot' || command === 'slots' || command === 's' || command === 'ws') {
                 const player = getRpgPlayer(userId, message.author.username);
-                
                 let betAmount = 100;
                 const maxBet = 250000;
 
@@ -524,35 +522,31 @@ client.on('messageCreate', async (message) => {
                 return;
             }
 
-            // --- 💣 MINIGAME: MINES (!m / !mine) GRID DALAM EMBED (OWO STYLE) ---
+            // --- 💣 MINIGAME: MINES (!m / !mine) STYLE OWO EMBED ---
             if (command === 'm' || command === 'mine') {
                 const player = getRpgPlayer(userId, message.author.username);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
                 const maxBet = 250000;
 
                 let betAmount = 100;
-                let mineCount = 3; // Otomatis 3 bom jika tidak diatur
+                let mineCount = 1;
 
                 if (args.length > 0) {
                     const arg0 = args[0].toLowerCase();
                     if (arg0 === 'all') {
                         betAmount = Math.min(player.balance, maxBet);
-                        if (args[1] && !isNaN(args[1])) {
-                            mineCount = parseInt(args[1]);
-                        }
                     } else if (!isNaN(args[0])) {
                         betAmount = parseInt(args[0]);
                         if (betAmount > maxBet) betAmount = maxBet;
                         if (betAmount < 1) betAmount = 1;
+                    }
 
-                        if (args[1] && !isNaN(args[1])) {
-                            mineCount = parseInt(args[1]);
-                        }
+                    if (args[1] && !isNaN(args[1])) {
+                        mineCount = parseInt(args[1]);
+                        if (mineCount < 1) mineCount = 1;
+                        if (mineCount > 8) mineCount = 8;
                     }
                 }
-
-                if (mineCount < 1) mineCount = 1;
-                if (mineCount > 8) mineCount = 8;
 
                 if (player.balance < betAmount) {
                     return message.channel.send(`❌ Saldo koin kamu kurang! Saldo kamu: ${currencyEmoji} \`${player.balance.toLocaleString('id-ID')}\``);
@@ -583,41 +577,19 @@ client.on('messageCreate', async (message) => {
                     mines: mineCount,
                     minePositions: minePositions,
                     opened: [],
-                    gameOver: false
+                    gameOver: false,
+                    messageRef: null
                 };
 
                 activeTimers.set(minesSessionKey, gameData);
 
-                const renderGridText = (isEnded = false) => {
-                    let board = "";
-                    for (let r = 0; r < 3; r++) {
-                        let rowStr = "";
-                        for (let c = 0; c < 3; c++) {
-                            let idx = r * 3 + c;
-                            if (gameData.opened.includes(idx)) {
-                                rowStr += "💎 ";
-                            } else if (isEnded) {
-                                if (gameData.minePositions.includes(idx)) {
-                                    rowStr += "💣 ";
-                                } else {
-                                    rowStr += "💎 ";
-                                }
-                            } else {
-                                rowStr += `\`[${idx + 1}]\` `;
-                            }
-                        }
-                        board += rowStr + "\n";
-                    }
-                    return board;
-                };
-
                 const buildMinesEmbed = (statusType, currentWin = 0, currentMult = 0.00, nextWin = 0, nextMult = 1.00) => {
-                    let embedColor = '#2F3136';
+                    let embedColor = '#2F3136'; 
                     let titleText = `💎 **<@${userId}>** started a mines game.`;
                     
                     if (statusType === 'cashout') {
                         embedColor = '#57F287';
-                        titleText = `💎 **<@${userId}>** cashed out safely!`;
+                        titleText = `💎 **<@${userId}>** cashed out!`;
                     } else if (statusType === 'win') {
                         embedColor = '#57F287';
                         titleText = `👑 **<@${userId}>** cleared all safe spots! JACKPOT!!`;
@@ -626,119 +598,78 @@ client.on('messageCreate', async (message) => {
                         titleText = `💥 **<@${userId}>** touched a mine!`;
                     }
 
-                    let isEnded = statusType === 'cashout' || statusType === 'win' || statusType === 'lose';
-
                     let desc = 
                         `\`\`\`\n` +
                         `Bet:  ${betAmount.toLocaleString('id-ID')}   Mines: ${mineCount}\n` +
                         (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
                         (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
                         `\`\`\`\n` +
-                        renderGridText(isEnded) +
-                        `────────────────────────\n` +
-                        (isEnded ? `*Game Berakhir.*` : `*Ketik angka \`1\` s.d \`9\` di chat untuk buka kotak, atau ketik \`cashout\` untuk ambil hadiah!*`);
+                        `────────────────────────`;
 
                     return new EmbedBuilder()
                         .setColor(embedColor)
                         .setDescription(`${titleText}\n${desc}`);
                 };
 
+                const generateMinesComponents = (isEnded = false) => {
+                    let rows = [];
+                    for (let r = 0; r < 3; r++) {
+                        let rowComponents = new ActionRowBuilder();
+                        for (let c = 0; c < 3; c++) {
+                            let index = r * 3 + c;
+                            let btnId = `mine_click_${userId}_${index}`;
+                            let label = "?";
+                            let style = ButtonStyle.Secondary;
+                            let disabled = isEnded;
+
+                            if (gameData.opened.includes(index)) {
+                                label = "💎";
+                                style = ButtonStyle.Success;
+                                disabled = true;
+                            } else if (isEnded) {
+                                if (gameData.minePositions.includes(index)) {
+                                    label = "💣";
+                                    style = ButtonStyle.Danger;
+                                } else {
+                                    label = "💎";
+                                    style = ButtonStyle.Secondary;
+                                }
+                                disabled = true;
+                            }
+
+                            rowComponents.addComponents(
+                                new ButtonBuilder().setCustomId(btnId).setLabel(label).setStyle(style).setDisabled(disabled)
+                            );
+                        }
+                        rows.push(rowComponents);
+                    }
+
+                    let currentOpened = gameData.opened.length;
+                    let cashOutRow = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`mine_cashout_${userId}`)
+                            .setLabel(`Cash Out`)
+                            .setStyle(ButtonStyle.Success)
+                            .setDisabled(isEnded || currentOpened === 0)
+                    );
+
+                    rows.push(cashOutRow);
+                    return rows;
+                };
+
                 let initialNextMult = calculateMultiplier(1, mineCount);
                 let initialNextWin = Math.floor(betAmount * initialNextMult);
 
                 const sentGameMsg = await message.channel.send({
-                    embeds: [buildMinesEmbed('playing', 0, 0.00, initialNextWin, initialNextMult)]
+                    embeds: [buildMinesEmbed('playing', 0, 0.00, initialNextWin, initialNextMult)],
+                    components: generateMinesComponents(false)
                 });
 
                 gameData.messageRef = sentGameMsg;
-
-                const filter = response => response.author.id === userId;
-                const collector = message.channel.createMessageCollector({ filter, time: 60000 });
-
-                collector.on('collect', async m => {
-                    if (gameData.gameOver) return;
-                    const txt = m.content.toLowerCase().trim();
-
-                    if (txt === 'cashout' || txt === 'c') {
-                        gameData.gameOver = true;
-                        collector.stop();
-                        const openedCount = gameData.opened.length;
-                        const finalMult = calculateMultiplier(openedCount, gameData.mines);
-                        const totalWin = Math.floor(gameData.bet * finalMult);
-                        player.balance += totalWin;
-                        activeTimers.delete(minesSessionKey);
-
-                        await sentGameMsg.edit({
-                            embeds: [buildMinesEmbed('cashout', totalWin, finalMult)]
-                        }).catch(() => {});
-                        return m.delete().catch(() => {});
-                    }
-
-                    const chosenNum = parseInt(txt);
-                    if (!isNaN(chosenNum) && chosenNum >= 1 && chosenNum <= 9) {
-                        const index = chosenNum - 1;
-
-                        if (gameData.opened.includes(index)) {
-                            return m.delete().catch(() => {});
-                        }
-
-                        if (gameData.minePositions.includes(index)) {
-                            gameData.gameOver = true;
-                            collector.stop();
-                            activeTimers.delete(minesSessionKey);
-                            gameData.opened.push(index);
-
-                            await sentGameMsg.edit({
-                                embeds: [buildMinesEmbed('lose')]
-                            }).catch(() => {});
-                            return m.delete().catch(() => {});
-                        }
-
-                        gameData.opened.push(index);
-                        const openedCount = gameData.opened.length;
-                        const maxSafeBoxes = 9 - gameData.mines;
-
-                        if (openedCount === maxSafeBoxes) {
-                            gameData.gameOver = true;
-                            collector.stop();
-                            const finalMult = calculateMultiplier(openedCount, gameData.mines);
-                            const totalWin = Math.floor(gameData.bet * finalMult);
-                            player.balance += totalWin;
-                            activeTimers.delete(minesSessionKey);
-
-                            await sentGameMsg.edit({
-                                embeds: [buildMinesEmbed('win', totalWin, finalMult)]
-                            }).catch(() => {});
-                            return m.delete().catch(() => {});
-                        }
-
-                        const currentMult = calculateMultiplier(openedCount, gameData.mines);
-                        const currentWin = Math.floor(gameData.bet * currentMult);
-                        const nextMult = calculateMultiplier(openedCount + 1, gameData.mines);
-                        const nextWin = Math.floor(gameData.bet * nextMult);
-
-                        await sentGameMsg.edit({
-                            embeds: [buildMinesEmbed('playing', currentWin, currentMult, nextWin, nextMult)]
-                        }).catch(() => {});
-
-                        return m.delete().catch(() => {});
-                    }
-                });
-
-                collector.on('end', async () => {
-                    if (!gameData.gameOver) {
-                        gameData.gameOver = true;
-                        activeTimers.delete(minesSessionKey);
-                        await sentGameMsg.edit({
-                            embeds: [buildMinesEmbed('lose')]
-                        }).catch(() => {});
-                    }
-                });
-
                 return;
             }
 
-            // --- 🪙 CEK SALDO (!cash / !bal) ---
+            // --- 🪙 CEK SALDO (!cash) ---
             if (command === 'cash' || command === 'bal' || command === 'balance') {
                 const player = getRpgPlayer(userId, message.author.username);
                 const currencyEmoji = '<:cowoncy:1549122224252784691>';
@@ -933,6 +864,205 @@ client.on('interactionCreate', async (interaction) => {
         const parts = interaction.customId.split('_');
         const guildId = interaction.guild?.id || 'dm';
         const serverCfg = getServerConfig(guildId);
+
+        // --- 💣 INTERAKSI TOMBOL MINES ---
+        if (interaction.customId.startsWith('mine_click_') || interaction.customId.startsWith('mine_cashout_')) {
+            const actionType = parts[1]; 
+            const ownerId = parts[2];
+            
+            if (interaction.user.id !== ownerId) {
+                return interaction.reply({ content: '❌ Ini bukan game Mines kamu!', ephemeral: true });
+            }
+
+            const minesSessionKey = `mines_${ownerId}`;
+            const gameData = activeTimers.get(minesSessionKey);
+
+            if (!gameData || gameData.gameOver) {
+                return interaction.update({ content: '❌ Game ini sudah selesai atau kedaluwarsa.', embeds: [], components: [] });
+            }
+
+            const player = getRpgPlayer(ownerId, interaction.user.username);
+
+            const calculateMultiplier = (openedCount, mCount) => {
+                let mult = 1.0;
+                for (let i = 0; i < openedCount; i++) {
+                    mult *= (9 - i) / (9 - mCount - i);
+                }
+                return Math.max(1.0, parseFloat((mult * 0.99).toFixed(2)));
+            };
+
+            const buildMinesEmbed = (statusType, currentWin = 0, currentMult = 0.00, nextWin = 0, nextMult = 1.00) => {
+                let embedColor = '#2F3136';
+                let titleText = `💎 **<@${ownerId}>** started a mines game.`;
+                
+                if (statusType === 'cashout') {
+                    embedColor = '#57F287';
+                    titleText = `💎 **<@${ownerId}>** cashed out!`;
+                } else if (statusType === 'win') {
+                    embedColor = '#57F287';
+                    titleText = `👑 **<@${ownerId}>** cleared all safe spots! JACKPOT!!`;
+                } else if (statusType === 'lose') {
+                    embedColor = '#ED4245';
+                    titleText = `💥 **<@${ownerId}>** touched a mine!`;
+                }
+
+                let desc = 
+                    `\`\`\`\n` +
+                    `Bet:  ${gameData.bet.toLocaleString('id-ID')}   Mines: ${gameData.mines}\n` +
+                    (statusType === 'lose' ? `Cash Out: 0 (0.00x)\n` : `Winnings: ${currentWin.toLocaleString('id-ID')} (${currentMult.toFixed(2)}x)\n`) +
+                    (statusType === 'playing' ? `Next:     ${nextWin.toLocaleString('id-ID')} (${nextMult.toFixed(2)}x)\n` : ``) +
+                    `\`\`\`\n` +
+                    `────────────────────────`;
+
+                return new EmbedBuilder()
+                    .setColor(embedColor)
+                    .setDescription(`${titleText}\n${desc}`);
+            };
+
+            const generateEndedComponents = () => {
+                let rows = [];
+                for (let r = 0; r < 3; r++) {
+                    let rowComponents = new ActionRowBuilder();
+                    for (let c = 0; c < 3; c++) {
+                        let index = r * 3 + c;
+                        let label = "💎";
+                        let style = ButtonStyle.Secondary;
+
+                        if (gameData.minePositions.includes(index)) {
+                            label = "💣";
+                            style = ButtonStyle.Danger;
+                        } else if (gameData.opened.includes(index)) {
+                            label = "💎";
+                            style = ButtonStyle.Success;
+                        }
+
+                        rowComponents.addComponents(
+                            new ButtonBuilder().setCustomId(`disabled_${index}`).setLabel(label).setStyle(style).setDisabled(true)
+                        );
+                    }
+                    rows.push(rowComponents);
+                }
+                return rows;
+            };
+
+            if (actionType === 'cashout') {
+                gameData.gameOver = true;
+                const openedCount = gameData.opened.length;
+                const finalMult = calculateMultiplier(openedCount, gameData.mines);
+                const totalWin = Math.floor(gameData.bet * finalMult);
+
+                player.balance += totalWin;
+                activeTimers.delete(minesSessionKey);
+
+                return interaction.update({
+                    embeds: [buildMinesEmbed('cashout', totalWin, finalMult)],
+                    components: generateEndedComponents()
+                });
+            }
+
+            if (actionType === 'click') {
+                const index = parseInt(parts[3]);
+
+                if (gameData.opened.includes(index)) {
+                    return interaction.deferUpdate();
+                }
+
+                if (gameData.minePositions.includes(index)) {
+                    gameData.gameOver = true;
+                    activeTimers.delete(minesSessionKey);
+
+                    let rows = [];
+                    for (let r = 0; r < 3; r++) {
+                        let rowComponents = new ActionRowBuilder();
+                        for (let c = 0; c < 3; c++) {
+                            let idx = r * 3 + c;
+                            let label = "💎";
+                            let style = ButtonStyle.Secondary;
+
+                            if (idx === index) {
+                                label = "💥";
+                                style = ButtonStyle.Danger;
+                            } else if (gameData.minePositions.includes(idx)) {
+                                label = "💣";
+                                style = ButtonStyle.Danger;
+                            } else if (gameData.opened.includes(idx)) {
+                                label = "💎";
+                                style = ButtonStyle.Success;
+                            }
+
+                            rowComponents.addComponents(
+                                new ButtonBuilder().setCustomId(`disabled_${idx}`).setLabel(label).setStyle(style).setDisabled(true)
+                            );
+                        }
+                        rows.push(rowComponents);
+                    }
+
+                    return interaction.update({
+                        embeds: [buildMinesEmbed('lose')],
+                        components: rows
+                    });
+                }
+
+                gameData.opened.push(index);
+                const openedCount = gameData.opened.length;
+                const maxSafeBoxes = 9 - gameData.mines;
+
+                if (openedCount === maxSafeBoxes) {
+                    gameData.gameOver = true;
+                    const finalMult = calculateMultiplier(openedCount, gameData.mines);
+                    const totalWin = Math.floor(gameData.bet * finalMult);
+                    player.balance += totalWin;
+                    activeTimers.delete(minesSessionKey);
+
+                    return interaction.update({
+                        embeds: [buildMinesEmbed('win', totalWin, finalMult)],
+                        components: generateEndedComponents()
+                    });
+                }
+
+                const currentMult = calculateMultiplier(openedCount, gameData.mines);
+                const currentWin = Math.floor(gameData.bet * currentMult);
+                
+                const nextMult = calculateMultiplier(openedCount + 1, gameData.mines);
+                const nextWin = Math.floor(gameData.bet * nextMult);
+
+                let rows = [];
+                for (let r = 0; r < 3; r++) {
+                    let rowComponents = new ActionRowBuilder();
+                    for (let c = 0; c < 3; c++) {
+                        let idx = r * 3 + c;
+                        let label = "?";
+                        let style = ButtonStyle.Secondary;
+                        let disabled = false;
+
+                        if (gameData.opened.includes(idx)) {
+                            label = "💎";
+                            style = ButtonStyle.Success;
+                            disabled = true;
+                        }
+
+                        rowComponents.addComponents(
+                            new ButtonBuilder().setCustomId(`mine_click_${ownerId}_${idx}`).setLabel(label).setStyle(style).setDisabled(disabled)
+                        );
+                    }
+                    rows.push(rowComponents);
+                }
+
+                rows.push(
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`mine_cashout_${ownerId}`)
+                            .setLabel(`Cash Out`)
+                            .setStyle(ButtonStyle.Success)
+                    )
+                );
+
+                return interaction.update({
+                    embeds: [buildMinesEmbed('playing', currentWin, currentMult, nextWin, nextMult)],
+                    components: rows
+                });
+            }
+        }
 
         if (interaction.customId === 'help_reminders') {
             return interaction.update({ embeds: [createHelpEmbed(interaction.guild?.name, interaction.user.displayAvatarURL(), serverCfg.botPrefix)], components: [createHelpButtons()] });
